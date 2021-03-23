@@ -1,0 +1,2 @@
+add_custom_target(inference)
+add_subdirectory(ultraFaceOnnx)
