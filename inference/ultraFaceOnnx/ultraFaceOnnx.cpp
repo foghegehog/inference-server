@@ -5,7 +5,6 @@
 //! [--useDLACore=<int>]
 //!
 
-
 #include "argsParser.h"
 #include "buffers.h"
 #include "common.h"
@@ -50,7 +49,7 @@ public:
     bool infer();
 
 private:
-    inferenceCommon::OnnxInferenceParams mParams; 
+    inferenceCommon::OnnxInferenceParams mParams;
 
     nvinfer1::Dims mInputDims;  //!< The dimensions of the input to the network.
     nvinfer1::Dims mOutputDims; //!< The dimensions of the output to the network.
@@ -86,7 +85,8 @@ private:
 //!
 bool UltraFaceOnnx::build()
 {
-    auto builder = InferenceUniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(inference::gLogger.getTRTLogger()));
+    auto builder
+        = InferenceUniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(inference::gLogger.getTRTLogger()));
     if (!builder)
     {
         return false;
@@ -105,8 +105,8 @@ bool UltraFaceOnnx::build()
         return false;
     }
 
-    auto parser
-        = InferenceUniquePtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, inference::gLogger.getTRTLogger()));
+    auto parser = InferenceUniquePtr<nvonnxparser::IParser>(
+        nvonnxparser::createParser(*network, inference::gLogger.getTRTLogger()));
     if (!parser)
     {
         return false;
@@ -128,7 +128,7 @@ bool UltraFaceOnnx::build()
     assert(network->getNbInputs() == 1);
     mInputDims = network->getInput(0)->getDimensions();
     assert(mInputDims.nbDims == 4);
-    //assert(mInputDims.nbDims == 3);
+    // assert(mInputDims.nbDims == 3);
 
     assert(network->getNbOutputs() == 4);
 
@@ -147,9 +147,9 @@ bool UltraFaceOnnx::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& bui
     InferenceUniquePtr<nvinfer1::INetworkDefinition>& network, InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
     InferenceUniquePtr<nvonnxparser::IParser>& parser)
 {
-    //parser->registerInput(mParams.inputTensorNames[0].c_str(), DimsCHW(3, 240, 320), nvuffparser::UffInputOrder::kNCHW);
-    //parser->registerOutput(mParams.outputTensorNames[0].c_str());
-    //parser->registerOutput(mParams.outputTensorNames[1].c_str());
+    // parser->registerInput(mParams.inputTensorNames[0].c_str(), DimsCHW(3, 240, 320),
+    // nvuffparser::UffInputOrder::kNCHW); parser->registerOutput(mParams.outputTensorNames[0].c_str());
+    // parser->registerOutput(mParams.outputTensorNames[1].c_str());
 
     auto parsed = parser->parseFromFile(locateFile(mParams.onnxFileName, mParams.dataDirs).c_str(),
         static_cast<int>(inference::gLogger.getReportableSeverity()));
@@ -229,35 +229,21 @@ bool UltraFaceOnnx::processInput(const inferenceCommon::BufferManager& buffers)
     const int inputH = mInputDims.d[2];
     const int inputW = mInputDims.d[3];
 
-    std::vector<std::string> imageList = 
-    {
-        "13_24_320_240.ppm",
-        "13_50.ppm",
-        "13_72.ppm",
-        "13_97.ppm",
-        "13_140.ppm",
-        "13_150.ppm",
-        "13_178.ppm",
-        "13_215.ppm",
-        "13_219.ppm",
-        "13_263.ppm",
-        "13_295.ppm",
-        "13_312.ppm",
-        "13_698.ppm",
-        "13_884.ppm"
-    };
+    std::vector<std::string> imageList
+        = {"13_24_320_240.ppm", "13_50.ppm", "13_72.ppm", "13_97.ppm", "13_140.ppm", "13_150.ppm", "13_178.ppm",
+            "13_215.ppm", "13_219.ppm", "13_263.ppm", "13_295.ppm", "13_312.ppm", "13_698.ppm", "13_884.ppm"};
 
     std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(batchSize);
 
     for (int i = 0; i < batchSize; ++i)
     {
         auto path = locateFile(imageList[i], mParams.dataDirs);
-        std::cout << "Reading image from path "<< path << endl;
+        std::cout << "Reading image from path " << path << endl;
         readPPMFile(path, ppms[i]);
     }
 
     float* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(mParams.inputTensorNames[0]));
-    float pixelMean[3]{127.0f, 127.0f, 127.0f}; 
+    float pixelMean[3]{127.0f, 127.0f, 127.0f};
 
     // Host memory for input buffer
     std::cout << "Preprocessing image" << endl;
@@ -268,10 +254,10 @@ bool UltraFaceOnnx::processInput(const inferenceCommon::BufferManager& buffers)
             // The color image to input should be in BGR order
             for (unsigned j = 0, volChl = inputH * inputW; j < volChl; ++j)
             {
-                hostDataBuffer[i * volImg + c * volChl + j] = 
-                    (float(ppms[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
-                    //(float(ppms[i].buffer[j * inputC + 2 - c]) - pixelMean[c]) / 128.0;
-                //if (j < 100)
+                hostDataBuffer[i * volImg + c * volChl + j]
+                    = (float(ppms[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
+                //(float(ppms[i].buffer[j * inputC + 2 - c]) - pixelMean[c]) / 128.0;
+                // if (j < 100)
                 //{
                 //    cout << hostDataBuffer[i * volImg + c * volChl + j] << endl;
                 //}
@@ -295,29 +281,29 @@ bool UltraFaceOnnx::verifyOutput(const inferenceCommon::BufferManager& buffers)
     const float* boxes = static_cast<const float*>(buffers.getHostBuffer("boxes"));
 
     ofstream outfile;
-    outfile.open ("13_24_320_240.txt");
+    outfile.open("13_24_320_240.txt");
 
-    for (int i=0; i<4420; ++i)
+    for (int i = 0; i < 4420; ++i)
     {
         array<string, 4> separators = {" ", " ", " ", ""};
         auto back_score = *(scores + i * 2);
-        auto face_score = *(scores + i * 2 + 1); 
+        auto face_score = *(scores + i * 2 + 1);
 
         outfile << back_score << endl;
         outfile << face_score << endl;
-       
-        for (int corners=4, c=0; c < corners; c++)
+
+        for (int corners = 4, c = 0; c < corners; c++)
         {
-            outfile << boxes[i*corners + c] << separators[c];
+            outfile << boxes[i * corners + c] << separators[c];
         }
         outfile << std::endl;
 
         if (face_score > 0.5)
         {
             cout << i << " " << face_score << endl;
-            for (int corners=4, c=0; c < corners; c++)
+            for (int corners = 4, c = 0; c < corners; c++)
             {
-                cout << boxes[i*corners + c] << separators[c];
+                cout << boxes[i * corners + c] << separators[c];
             }
             cout << std::endl;
         }
@@ -359,7 +345,8 @@ inferenceCommon::OnnxInferenceParams initializeInferenceParams(const inferenceCo
 void printHelpInfo()
 {
     /*std::cout
-        << "Usage: ./ultra_face_onnx" << std::endl;// [-h or --help] [-d or --datadir=<path to data directory>] [--useDLACore=<int>]"
+        << "Usage: ./ultra_face_onnx" << std::endl;// [-h or --help] [-d or --datadir=<path to data directory>]
+    [--useDLACore=<int>]"
         << std::endl;
     std::cout << "--help          Display help information" << std::endl;
     std::cout << "--datadir       Specify path to a data directory, overriding the default. This option can be used "
