@@ -9,7 +9,8 @@ struct Detection
     std::array<float, 4> mBox;
 
     Detection(float score, const std::array<float, 4> box)
-        :mScore(score), mBox(box)
+        : mScore(score)
+        , mBox(box)
     {
     }
 };

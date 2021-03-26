@@ -25,7 +25,6 @@
 
 const std::string gInferenceName = "TensorRT.ultra_face_onnx";
 
-
 //!
 //! \brief Initializes members of the params struct using the command line args
 //!
@@ -87,7 +86,6 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    
     auto inferenceTest = inference::gLogger.defineTest(gInferenceName, argc, argv);
 
     inference::gLogger.reportTestStart(inferenceTest);
@@ -102,23 +100,10 @@ int main(int argc, char** argv)
         return inference::gLogger.reportFail(inferenceTest);
     }
 
-    std::vector<std::string> imageList = 
-    {
-        "13_24_320_240.ppm",
-        "13_50_320_240.ppm",
-        "13_72_320_240.ppm",
-        "13_97_320_240.ppm",
-        "13_140_320_240.ppm",
-        "13_150_320_240.ppm",
-        "13_178_320_240.ppm",
-        "13_215_320_240.ppm",
-        "13_219_320_240.ppm", 
-        "13_263_320_240.ppm",
-        "13_295_320_240.ppm",
-        "13_312_320_240.ppm",
-        "13_698_320_240.ppm",
-        "13_884_320_240.ppm"
-    };
+    std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
+        "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
+        "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
+        "13_884_320_240.ppm"};
 
     std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(params.batchSize);
     std::vector<Detection> detections;
@@ -132,7 +117,7 @@ int main(int argc, char** argv)
             auto path = locateFile(imageList[image_index], params.dataDirs);
             inference::gLogInfo << "Reading image from path " << path << std::endl;
             readPPMFile(path, ppms[i]);
-        } 
+        }
 
         if (!inference.infer(ppms, detections))
         {
@@ -140,9 +125,9 @@ int main(int argc, char** argv)
         }
 
         array<string, 4> separators = {", ", ", ", ", ", ""};
-        for(const auto& d: detections)
+        for (const auto& d : detections)
         {
-            inference::gLogInfo << "Detection: "<< d.mScore << endl;
+            inference::gLogInfo << "Detection: " << d.mScore << endl;
             for (int corners = 4, c = 0; c < corners; c++)
             {
                 inference::gLogInfo << d.mBox[c] << separators[c];

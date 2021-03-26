@@ -1,5 +1,5 @@
-#include "logging.h"
 #include "ultraFaceOnnx.h"
+#include "logging.h"
 
 //!
 //! \brief Creates the network, configures the builder and creates the network engine
@@ -101,9 +101,7 @@ bool UltraFaceOnnx::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& bui
 //! \details This function is the main execution function. It allocates the buffer,
 //!          sets inputs and executes the engine.
 //!
-bool UltraFaceOnnx::infer(
-        std::vector<inferenceCommon::PPM<3, 240, 320>> batch,
-        std::vector<Detection> &detections)
+bool UltraFaceOnnx::infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, std::vector<Detection>& detections)
 {
     // Create RAII buffer manager object
     inferenceCommon::BufferManager buffers(mEngine);
@@ -146,8 +144,7 @@ bool UltraFaceOnnx::infer(
 //! \brief Reads the input and stores the result in a managed buffer
 //!
 bool UltraFaceOnnx::preprocessInput(
-    const inferenceCommon::BufferManager& buffers,
-    const std::vector<inferenceCommon::PPM<3, 240, 320>> &batch)
+    const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch)
 {
     /*std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
         "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
@@ -163,7 +160,7 @@ bool UltraFaceOnnx::preprocessInput(
         readPPMFile(path, ppms[i]);
     }*/
 
-    //const int batchSize = mInputDims.d[0];
+    // const int batchSize = mInputDims.d[0];
     const int batchSize = batch.size();
     const int inputC = mInputDims.d[1];
     const int inputH = mInputDims.d[2];
@@ -196,35 +193,33 @@ bool UltraFaceOnnx::preprocessInput(
 //!
 //! \return whether the output matches expectations
 //!
-bool UltraFaceOnnx::parseOutput(
-    const inferenceCommon::BufferManager& buffers,
-    std::vector<Detection> &detections)
+bool UltraFaceOnnx::parseOutput(const inferenceCommon::BufferManager& buffers, std::vector<Detection>& detections)
 {
     inference::gLogInfo << "Output phase reached." << std::endl;
 
     const float* scores = static_cast<const float*>(buffers.getHostBuffer("scores"));
     const float* boxes = static_cast<const float*>(buffers.getHostBuffer("boxes"));
 
-    //ofstream outfile;
-    //outfile.open("13_24_320_240.txt");
+    // ofstream outfile;
+    // outfile.open("13_24_320_240.txt");
 
     for (int i = 0; i < 4420; ++i)
     {
-        //array<string, 4> separators = {" ", " ", " ", ""};
+        // array<string, 4> separators = {" ", " ", " ", ""};
         auto backScore = *(scores + i * 2);
         auto faceScore = *(scores + i * 2 + 1);
 
-        //outfile << back_score << endl;
-        //outfile << face_score << endl;
+        // outfile << back_score << endl;
+        // outfile << face_score << endl;
 
         const int corners = 4;
-        
-        //for (int c = 0; c < corners; c++)
+
+        // for (int c = 0; c < corners; c++)
         //{
-            
-            //outfile << boxes[i * corners + c] << separators[c];
+
+        // outfile << boxes[i * corners + c] << separators[c];
         //}
-        //outfile << std::endl;
+        // outfile << std::endl;
 
         if (faceScore > 0.9)
         {
@@ -235,12 +230,11 @@ bool UltraFaceOnnx::parseOutput(
             }
 
             detections.emplace_back(faceScore, box);
-            //cout << std::endl;
+            // cout << std::endl;
         }
     }
 
-    //outfile.close();
+    // outfile.close();
 
     return true;
 }
-

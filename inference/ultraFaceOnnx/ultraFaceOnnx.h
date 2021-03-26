@@ -2,8 +2,8 @@
 #define ULTRA_FACE_ONNX_H
 
 #include "argsParser.h"
-#include "common.h"
 #include "buffers.h"
+#include "common.h"
 #include "detection.h"
 #include "parserOnnxConfig.h"
 
@@ -37,9 +37,7 @@ public:
     //!
     //! \brief Runs the TensorRT inference engine
     //!
-    bool infer(
-        std::vector<inferenceCommon::PPM<3, 240, 320>> batch,
-        std::vector<Detection> &detections);
+    bool infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, std::vector<Detection>& detections);
 
 private:
     inferenceCommon::OnnxInferenceParams mParams;
@@ -54,23 +52,19 @@ private:
     //! \brief Parses an ONNX model for MNIST and creates a TensorRT network
     //!
     bool constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& builder,
-        InferenceUniquePtr<nvinfer1::INetworkDefinition>& network,
-        InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
+        InferenceUniquePtr<nvinfer1::INetworkDefinition>& network, InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
         InferenceUniquePtr<nvonnxparser::IParser>& parser);
 
     //!
     //! \brief Reads the input  and stores the result in a managed buffer
     //!
     bool preprocessInput(
-        const inferenceCommon::BufferManager& buffers,
-        const std::vector<inferenceCommon::PPM<3, 240, 320>> &batch);
+        const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch);
 
     //!
     //! \brief Classifies digits and verify result
     //!
-    bool parseOutput(
-        const inferenceCommon::BufferManager& buffers,
-        std::vector<Detection> &detections);
+    bool parseOutput(const inferenceCommon::BufferManager& buffers, std::vector<Detection>& detections);
 };
 
 #endif
