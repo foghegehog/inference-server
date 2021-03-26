@@ -53,6 +53,9 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${TRT_LIB_DIR}/../ CACHE PATH "TensorRT installation" FORCE)
 endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
+option(BUILD_PLUGINS "Build TensorRT plugin" ON)
+option(BUILD_PARSERS "Build TensorRT parsers" ON)
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -175,8 +178,17 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -Wno-deprecated-declaration
 # TensorRT
 
 
-find_library_create_target(nvinfer_plugin nvinfer_plugin SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
-find_library_create_target(nvcaffeparser nvparsers SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
-find_library_create_target(nvonnxparser nvonnxparser SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
+if(BUILD_PLUGINS)
+    add_subdirectory(plugin)
+else()
+    find_library_create_target(nvinfer_plugin nvinfer_plugin SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
+endif()
+
+if(BUILD_PARSERS)
+    add_subdirectory(parsers)
+else()
+    find_library_create_target(nvcaffeparser nvparsers SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
+    find_library_create_target(nvonnxparser nvonnxparser SHARED ${TRT_OUT_DIR} ${TRT_LIB_DIR})
+endif()
 
 add_subdirectory(inference)

@@ -70,7 +70,7 @@ if(BERT_GENCODES)
         )
 endif()
 
-include_directories(common common/kernels ../samples/common)
+include_directories(common common/kernels ../inference/common)
 
 foreach(PLUGIN_ITER ${PLUGIN_LISTS})
     include_directories(${PLUGIN_ITER})
@@ -89,7 +89,7 @@ if (BERT_CU_SOURCES)
 endif()
 
 list(APPEND PLUGIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/InferPlugin.cpp")
-list(APPEND PLUGIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../samples/common/logger.cpp")
+list(APPEND PLUGIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../inference/common/logger.cpp")
 
 ################################## SHARED LIBRARY #######################################
 

@@ -1,4 +1,5 @@
 SET(INFERENCE_SOURCES
+    main.cpp
     ultraFaceOnnx.cpp
 )
 

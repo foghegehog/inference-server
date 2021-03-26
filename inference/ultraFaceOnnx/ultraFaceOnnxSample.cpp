@@ -1,5 +1,4 @@
-#include "logging.h"
-#include "ultraFaceOnnx.h"
+#include "ultraFaceOnnxSample.h"
 
 //!
 //! \brief Creates the network, configures the builder and creates the network engine
@@ -9,7 +8,7 @@
 //!
 //! \return Returns true if the engine was created successfully and false otherwise
 //!
-bool UltraFaceOnnx::build()
+bool UltraFaceOnnxSample::build()
 {
     auto builder
         = InferenceUniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(inference::gLogger.getTRTLogger()));
@@ -54,6 +53,7 @@ bool UltraFaceOnnx::build()
     assert(network->getNbInputs() == 1);
     mInputDims = network->getInput(0)->getDimensions();
     assert(mInputDims.nbDims == 4);
+    // assert(mInputDims.nbDims == 3);
 
     assert(network->getNbOutputs() == 4);
 
@@ -68,10 +68,14 @@ bool UltraFaceOnnx::build()
 //!
 //! \param builder Pointer to the engine builder
 //!
-bool UltraFaceOnnx::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& builder,
+bool UltraFaceOnnxSample::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& builder,
     InferenceUniquePtr<nvinfer1::INetworkDefinition>& network, InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
     InferenceUniquePtr<nvonnxparser::IParser>& parser)
 {
+    // parser->registerInput(mParams.inputTensorNames[0].c_str(), DimsCHW(3, 240, 320),
+    // nvuffparser::UffInputOrder::kNCHW); parser->registerOutput(mParams.outputTensorNames[0].c_str());
+    // parser->registerOutput(mParams.outputTensorNames[1].c_str());
+
     auto parsed = parser->parseFromFile(locateFile(mParams.onnxFileName, mParams.dataDirs).c_str(),
         static_cast<int>(inference::gLogger.getReportableSeverity()));
     if (!parsed)
@@ -101,9 +105,7 @@ bool UltraFaceOnnx::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& bui
 //! \details This function is the main execution function. It allocates the buffer,
 //!          sets inputs and executes the engine.
 //!
-bool UltraFaceOnnx::infer(
-        std::vector<inferenceCommon::PPM<3, 240, 320>> batch,
-        std::vector<Detection> &detections)
+bool UltraFaceOnnxSample::infer()
 {
     // Create RAII buffer manager object
     inferenceCommon::BufferManager buffers(mEngine);
@@ -116,7 +118,7 @@ bool UltraFaceOnnx::infer(
 
     // Read the input data into the managed buffers
     assert(mParams.inputTensorNames.size() == 1);
-    if (!preprocessInput(buffers, batch))
+    if (!processInput(buffers))
     {
         return false;
     }
@@ -134,7 +136,7 @@ bool UltraFaceOnnx::infer(
     buffers.copyOutputToHost();
 
     // Verify results
-    if (!parseOutput(buffers, detections))
+    if (!verifyOutput(buffers))
     {
         return false;
     }
@@ -145,11 +147,14 @@ bool UltraFaceOnnx::infer(
 //!
 //! \brief Reads the input and stores the result in a managed buffer
 //!
-bool UltraFaceOnnx::preprocessInput(
-    const inferenceCommon::BufferManager& buffers,
-    const std::vector<inferenceCommon::PPM<3, 240, 320>> &batch)
+bool UltraFaceOnnxSample::processInput(const inferenceCommon::BufferManager& buffers)
 {
-    /*std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
+    const int batchSize = mInputDims.d[0];
+    const int inputC = mInputDims.d[1];
+    const int inputH = mInputDims.d[2];
+    const int inputW = mInputDims.d[3];
+
+    std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
         "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
         "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
         "13_884_320_240.ppm"};
@@ -161,19 +166,13 @@ bool UltraFaceOnnx::preprocessInput(
         auto path = locateFile(imageList[i], mParams.dataDirs);
         std::cout << "Reading image from path " << path << endl;
         readPPMFile(path, ppms[i]);
-    }*/
-
-    //const int batchSize = mInputDims.d[0];
-    const int batchSize = batch.size();
-    const int inputC = mInputDims.d[1];
-    const int inputH = mInputDims.d[2];
-    const int inputW = mInputDims.d[3];
+    }
 
     float* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(mParams.inputTensorNames[0]));
     float pixelMean[3]{127.0f, 127.0f, 127.0f};
 
     // Host memory for input buffer
-    inference::gLogInfo << "Preprocessing image" << std::endl;
+    std::cout << "Preprocessing image" << endl;
     for (int i = 0, volImg = inputC * inputH * inputW; i < mParams.batchSize; ++i)
     {
         for (int c = 0; c < inputC; ++c)
@@ -182,8 +181,12 @@ bool UltraFaceOnnx::preprocessInput(
             for (unsigned j = 0, volChl = inputH * inputW; j < volChl; ++j)
             {
                 hostDataBuffer[i * volImg + c * volChl + j]
-                    = (float(batch[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
+                    = (float(ppms[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
                 //(float(ppms[i].buffer[j * inputC + 2 - c]) - pixelMean[c]) / 128.0;
+                // if (j < 100)
+                //{
+                //    cout << hostDataBuffer[i * volImg + c * volChl + j] << endl;
+                //}
             }
         }
     }
@@ -192,55 +195,47 @@ bool UltraFaceOnnx::preprocessInput(
 }
 
 //!
-//! \brief Detects objects and verify result
+//! \brief Classifies digits and verify result
 //!
-//! \return whether the output matches expectations
+//! \return whether the classification output matches expectations
 //!
-bool UltraFaceOnnx::parseOutput(
-    const inferenceCommon::BufferManager& buffers,
-    std::vector<Detection> &detections)
+bool UltraFaceOnnxSample::verifyOutput(const inferenceCommon::BufferManager& buffers)
 {
-    inference::gLogInfo << "Output phase reached." << std::endl;
+    std::cout << "Output phase reached." << endl;
 
     const float* scores = static_cast<const float*>(buffers.getHostBuffer("scores"));
     const float* boxes = static_cast<const float*>(buffers.getHostBuffer("boxes"));
 
-    //ofstream outfile;
-    //outfile.open("13_24_320_240.txt");
+    ofstream outfile;
+    outfile.open("13_24_320_240.txt");
 
     for (int i = 0; i < 4420; ++i)
     {
-        //array<string, 4> separators = {" ", " ", " ", ""};
-        auto backScore = *(scores + i * 2);
-        auto faceScore = *(scores + i * 2 + 1);
+        array<string, 4> separators = {" ", " ", " ", ""};
+        auto back_score = *(scores + i * 2);
+        auto face_score = *(scores + i * 2 + 1);
 
-        //outfile << back_score << endl;
-        //outfile << face_score << endl;
+        outfile << back_score << endl;
+        outfile << face_score << endl;
 
-        const int corners = 4;
-        
-        //for (int c = 0; c < corners; c++)
-        //{
-            
-            //outfile << boxes[i * corners + c] << separators[c];
-        //}
-        //outfile << std::endl;
-
-        if (faceScore > 0.9)
+        for (int corners = 4, c = 0; c < corners; c++)
         {
-            std::array<float, corners> box;
-            for (int c = 0; c < corners; c++)
-            {
-                box[c] = boxes[i * corners + c];
-            }
+            outfile << boxes[i * corners + c] << separators[c];
+        }
+        outfile << std::endl;
 
-            detections.emplace_back(faceScore, box);
-            //cout << std::endl;
+        if (face_score > 0.5)
+        {
+            cout << i << " " << face_score << endl;
+            for (int corners = 4, c = 0; c < corners; c++)
+            {
+                cout << boxes[i * corners + c] << separators[c];
+            }
+            cout << std::endl;
         }
     }
 
-    //outfile.close();
+    outfile.close();
 
     return true;
 }
-
