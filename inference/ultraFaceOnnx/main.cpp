@@ -103,7 +103,7 @@ int main(int argc, char** argv)
     std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
         "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
         "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
-        "13_884_320_240.ppm"};
+        "13_884_320_240.ppm", "webcam_320_240.ppm"};
 
     std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(params.batchSize);
     std::vector<Detection> detections;
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
             return inference::gLogger.reportFail(inferenceTest);
         }
 
-        array<string, 4> separators = {", ", ", ", ", ", ""};
+        array<string, 4> separators = {" ", " ", " ", ""};
         for (const auto& d : detections)
         {
             inference::gLogInfo << "Detection: " << d.mScore << endl;
