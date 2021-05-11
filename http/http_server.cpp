@@ -69,18 +69,27 @@ path_cat(
     return result;
 }
 
-// This function produces an HTTP response for the given
-// request. The type of the response object depends on the
-// contents of the request, so the interface requires the
-// caller to pass a generic lambda for receiving the response.
-template<
-    class Body, class Allocator,
-    class Send>
-void
-handle_request(
+template<class Body, class Stream>
+void write_response(
+    http::response<Body>&& response, Stream& stream, bool& close, beast::error_code& ec)
+{
+    // Determine if we should close the connection after
+    close = response.need_eof();
+
+    // We need the serializer here because the serializer requires
+    // a non-const file_body, and the message oriented version of
+    // http::write only works with const messages.
+    http::serializer<false, Body> sr{response};
+    http::write(stream, sr, ec);
+}
+
+template<class Body, class Allocator, class Stream>
+void handle_request(
     beast::string_view doc_root,
     http::request<Body, http::basic_fields<Allocator>>&& req,
-    Send&& send)
+    Stream& response_stream,
+    bool& should_close, 
+    beast::error_code& error)
 {
     // Returns a bad request response
     auto const bad_request =
@@ -124,13 +133,17 @@ handle_request(
     // Make sure we can handle the method
     if( req.method() != http::verb::get &&
         req.method() != http::verb::head)
-        return send(bad_request("Unknown HTTP-method"));
+    {
+        return write_response(bad_request("Unknown HTTP-method"), response_stream, should_close, error);
+    }
 
     // Request path must be absolute and not contain "..".
     if( req.target().empty() ||
         req.target()[0] != '/' ||
         req.target().find("..") != beast::string_view::npos)
-        return send(bad_request("Illegal request-target"));
+    {
+        write_response(bad_request("Illegal request-target"), response_stream, should_close, error);
+    }
 
     // Build the path to the requested file
     std::string path = path_cat(doc_root, req.target());
@@ -144,11 +157,15 @@ handle_request(
 
     // Handle the case where the file doesn't exist
     if(ec == beast::errc::no_such_file_or_directory)
-        return send(not_found(req.target()));
+    { 
+        write_response(not_found(req.target()), response_stream, should_close, error);
+    }
 
     // Handle an unknown error
     if(ec)
-        return send(server_error(ec.message()));
+    {
+        write_response(server_error(ec.message()), response_stream, should_close, error);
+    }
 
     // Cache the size since we need it after the move
     auto const size = body.size();
@@ -161,7 +178,7 @@ handle_request(
         res.set(http::field::content_type, mime_type(path));
         res.content_length(size);
         res.keep_alive(req.keep_alive());
-        return send(std::move(res));
+        write_response(std::move(res), response_stream, should_close, error);
     }
 
     // Respond to GET request
@@ -173,7 +190,7 @@ handle_request(
     res.set(http::field::content_type, mime_type(path));
     res.content_length(size);
     res.keep_alive(req.keep_alive());
-    return send(std::move(res));
+    write_response(std::move(res), response_stream, should_close, error);
 }
 
 //------------------------------------------------------------------------------
@@ -184,41 +201,6 @@ fail(beast::error_code ec, char const* what)
 {
     std::cerr << what << ": " << ec.message() << "\n";
 }
-
-// This is the C++11 equivalent of a generic lambda.
-// The function object is used to send an HTTP message.
-template<class Stream>
-struct send_lambda
-{
-    Stream& stream_;
-    bool& close_;
-    beast::error_code& ec_;
-
-    explicit
-    send_lambda(
-        Stream& stream,
-        bool& close,
-        beast::error_code& ec)
-        : stream_(stream)
-        , close_(close)
-        , ec_(ec)
-    {
-    }
-
-    template<bool isRequest, class Body, class Fields>
-    void
-    operator()(http::message<isRequest, Body, Fields>&& msg) const
-    {
-        // Determine if we should close the connection after
-        close_ = msg.need_eof();
-
-        // We need the serializer here because the serializer requires
-        // a non-const file_body, and the message oriented version of
-        // http::write only works with const messages.
-        http::serializer<isRequest, Body, Fields> sr{msg};
-        http::write(stream_, sr, ec_);
-    }
-};
 
 // Handles an HTTP server connection
 void
@@ -232,9 +214,6 @@ do_session(
     // This buffer is required to persist across reads
     beast::flat_buffer buffer;
 
-    // This lambda is used to send messages
-    send_lambda<tcp::socket> lambda{socket, close, ec};
-
     for(;;)
     {
         // Read a request
@@ -246,7 +225,8 @@ do_session(
             return fail(ec, "read");
 
         // Send the response
-        handle_request(*doc_root, std::move(req), lambda);
+        //handle_request(*doc_root, std::move(req), lambda);
+        handle_request(*doc_root, std::move(req), socket, close, ec);
         if(ec)
             return fail(ec, "write");
         if(close)
@@ -273,9 +253,9 @@ int main(int argc, char* argv[])
         if (argc != 4)
         {
             std::cerr <<
-                "Usage: http-server-sync <address> <port> <doc_root>\n" <<
+                "Usage: http-server <address> <port> <doc_root>\n" <<
                 "Example:\n" <<
-                "    http-server-sync 0.0.0.0 8080 .\n";
+                "    http-server 0.0.0.0 8080 .\n";
             return EXIT_FAILURE;
         }
         auto const address = net::ip::make_address(argv[1]);
