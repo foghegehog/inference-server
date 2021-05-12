@@ -4,8 +4,13 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/config.hpp>
 #include <cstdlib>
+#include <chrono>
+#include <iomanip>
 #include <iostream>
+#include <fstream>
+#include <map> 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -13,6 +18,9 @@ namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+
+std::mutex multipart_mutex;
+std::map<std::string, std::string> multiparts; 
 
 //------------------------------------------------------------------------------
 
@@ -83,7 +91,7 @@ void write_response(
     http::write(stream, sr, ec);
 }
 
-template<class Body, class Allocator, class Stream>
+/*template<class Body, class Allocator, class Stream>
 void handle_request(
     beast::string_view doc_root,
     http::request<Body, http::basic_fields<Allocator>>&& req,
@@ -191,6 +199,52 @@ void handle_request(
     res.content_length(size);
     res.keep_alive(req.keep_alive());
     write_response(std::move(res), response_stream, should_close, error);
+}*/
+
+void handle_request(
+    http::request<http::string_body>&& req,
+    tcp::socket& socket,
+    beast::error_code& error)
+{
+    http::response<http::empty_body> res{http::status::ok, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
+    res.keep_alive();
+    http::response_serializer<http::empty_body> sr{res};
+    http::write_header(socket, sr);
+
+    char buffer[10000];
+    for (auto f = 0; f < 4410; f++)
+    {
+        std::stringstream filename;
+        filename <<  "./corridor/" << std::setw(8) << std::setfill('0') << std::to_string(f) << ".jpg";  
+        std::ifstream infile(filename.str());
+
+        //get length of file
+        infile.seekg(0, std::ios::end);
+        size_t length = infile.tellg();
+        infile.seekg(0, std::ios::beg);
+
+        if (length > sizeof (buffer))
+        {
+            length = sizeof (buffer);
+        }
+
+        //read file
+        infile.read(buffer, length);
+        std::vector<unsigned char> cut_buffer(buffer, buffer+length);
+
+        http::response<http::vector_body<unsigned char>> res{std::piecewise_construct,
+                        std::make_tuple(std::move(cut_buffer)),
+                        std::make_tuple(http::status::ok, req.version())};
+        res.set(http::field::body, "--frame");
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "image/jpeg");
+        res.content_length(length);
+        res.keep_alive(req.keep_alive());
+        http::write(socket, res, error);
+        std::this_thread::sleep_for(std::chrono::milliseconds(42));
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -205,8 +259,7 @@ fail(beast::error_code ec, char const* what)
 // Handles an HTTP server connection
 void
 do_session(
-    tcp::socket& socket,
-    std::shared_ptr<std::string const> const& doc_root)
+    tcp::socket& socket)
 {
     bool close = false;
     beast::error_code ec;
@@ -226,7 +279,8 @@ do_session(
 
         // Send the response
         //handle_request(*doc_root, std::move(req), lambda);
-        handle_request(*doc_root, std::move(req), socket, close, ec);
+        //handle_request(*doc_root, std::move(req), socket, close, ec);
+        handle_request(std::move(req), socket, ec);
         if(ec)
             return fail(ec, "write");
         if(close)
@@ -278,8 +332,7 @@ int main(int argc, char* argv[])
             // Launch the session, transferring ownership of the socket
             std::thread{std::bind(
                 &do_session,
-                std::move(socket),
-                doc_root)}.detach();
+                std::move(socket))}.detach();
         }
     }
     catch (const std::exception& e)
