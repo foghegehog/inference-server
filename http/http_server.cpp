@@ -11,6 +11,7 @@
 #include <map> 
 #include <memory>
 #include <mutex>
+#include <opencv2/imgcodecs.hpp>
 #include <string>
 #include <thread>
 
@@ -213,12 +214,12 @@ void handle_request(
     http::response_serializer<http::empty_body> sr{res};
     http::write_header(socket, sr);
 
-    char buffer[10000];
+    std::vector<uchar> buffer;
     for (auto f = 0; f < 4410; f++)
     {
-        std::stringstream filename;
-        filename <<  "./corridor/" << std::setw(8) << std::setfill('0') << std::to_string(f) << ".jpg";  
-        std::ifstream infile(filename.str());
+        std::stringstream filename_stream;
+        filename_stream <<  "./corridor/" << std::setw(8) << std::setfill('0') << std::to_string(f) << ".jpg";  
+        /*std::ifstream infile(filename.str());
 
         //get length of file
         infile.seekg(0, std::ios::end);
@@ -232,18 +233,34 @@ void handle_request(
 
         //read file
         infile.read(buffer, length);
-        std::vector<unsigned char> cut_buffer(buffer, buffer+length);
+        std::vector<unsigned char> cut_buffer(buffer, buffer+length);*/
+        auto filename = filename_stream.str();
+        cv::Mat frame = cv::imread(filename);
+        std::cout << filename;
+        if (frame.empty())
+        {
+            std::cout << " is empty." << std::endl;
+            continue;
+        }
+        else
+        {
+            std::cout << std::endl;
+        }
+
+        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 95};
+        cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
+        auto const size = buffer.size();
 
         http::response<http::vector_body<unsigned char>> res{std::piecewise_construct,
-                        std::make_tuple(std::move(cut_buffer)),
+                        std::make_tuple(std::move(buffer)),
                         std::make_tuple(http::status::ok, req.version())};
         res.set(http::field::body, "--frame");
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "image/jpeg");
-        res.content_length(length);
+        res.content_length(size);
         res.keep_alive(req.keep_alive());
         http::write(socket, res, error);
-        std::this_thread::sleep_for(std::chrono::milliseconds(42));
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
     }
 }
 

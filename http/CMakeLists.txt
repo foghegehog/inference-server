@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.2)
 project(http_server VERSION 0.0.1)
 
 find_package(Boost COMPONENTS thread system REQUIRED)
+find_package( OpenCV REQUIRED )
+
+include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 add_executable (http-server
     ${BOOST_BEAST_FILES}
@@ -23,6 +26,7 @@ set_target_properties(http-server PROPERTIES
 
 target_link_libraries(http-server PRIVATE
     ${Boost_LIBRARIES}
+    ${OpenCV_LIBS}
 )
 
 if (MSVC)
