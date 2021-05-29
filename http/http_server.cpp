@@ -12,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <string>
 #include <thread>
 
@@ -219,24 +220,10 @@ void handle_request(
     {
         std::stringstream filename_stream;
         filename_stream <<  "./corridor/" << std::setw(8) << std::setfill('0') << std::to_string(f) << ".jpg";  
-        /*std::ifstream infile(filename.str());
 
-        //get length of file
-        infile.seekg(0, std::ios::end);
-        size_t length = infile.tellg();
-        infile.seekg(0, std::ios::beg);
-
-        if (length > sizeof (buffer))
-        {
-            length = sizeof (buffer);
-        }
-
-        //read file
-        infile.read(buffer, length);
-        std::vector<unsigned char> cut_buffer(buffer, buffer+length);*/
         auto filename = filename_stream.str();
         cv::Mat frame = cv::imread(filename);
-        std::cout << filename;
+        //std::cout << filename;
         if (frame.empty())
         {
             std::cout << " is empty." << std::endl;
@@ -248,6 +235,7 @@ void handle_request(
         }
 
         std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 95};
+        cv::rectangle(frame, cv::Point(200, 200), cv::Point(300, 300), cv::Scalar(0, 255, 0));
         cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
         auto const size = buffer.size();
 
