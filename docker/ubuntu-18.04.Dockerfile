@@ -37,6 +37,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dh-make \
     build-essential
 
+RUN add-apt-repository ppa:mhier/libboost-latest
+RUN apt update && apt install -y libboost1.68 libboost1.68-dev
+
 # Install python3
 RUN apt-get install -y --no-install-recommends \
       python3 \
@@ -67,6 +70,16 @@ RUN cd /tmp && \
     chmod +x cmake-3.14.4-Linux-x86_64.sh && \
     ./cmake-3.14.4-Linux-x86_64.sh --prefix=/usr/local --exclude-subdir --skip-license && \
     rm ./cmake-3.14.4-Linux-x86_64.sh
+
+# Install OpenCV
+RUN cd /tmp && \
+    wget -O opencv.zip https://github.com/opencv/opencv/archive/master.zip && \
+    unzip opencv.zip && \
+    mv opencv-master opencv && \
+    mkdir -p build && cd build && \
+    cmake ../opencv && \
+    make -j4 && \
+    make install
 
 # Download NGC client
 RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc && rm ngccli_cat_linux.zip ngc.md5 && echo "no-apikey\nascii\n" | ngc config set

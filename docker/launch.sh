@@ -22,7 +22,7 @@ if [ "$arg_gpus" != "none" ]; then
     extra_args="$extra_args --gpus $arg_gpus"
 fi
 
-docker_args="$extra_args -v ${PWD}:/workspace/TensorRT -v /usr/src/tensorrt/data:/workspace/data --rm -it $arg_tag:latest"
+docker_args="$extra_args -v ${PWD}:/workspace/TensorRT -v /usr/src/tensorrt/data:/workspace/data -p 0.0.0.0:8080:8080 --rm -it $arg_tag:latest"
 
 echo "Launching container:"
 echo "> docker run $docker_args"
