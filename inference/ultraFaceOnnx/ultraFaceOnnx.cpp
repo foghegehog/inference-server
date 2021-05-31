@@ -141,25 +141,56 @@ bool UltraFaceOnnx::infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, 
 }
 
 //!
+//! \brief Runs the TensorRT inference engine
+//!
+//! \details This function is the main execution function. It allocates the buffer,
+//!          sets inputs and executes the engine.
+//!
+bool UltraFaceOnnx::infer(const std::vector<cv::Mat>& batch, std::vector<Detection>& detections)
+{
+    // Create RAII buffer manager object
+    inferenceCommon::BufferManager buffers(mEngine);
+
+    auto context = InferenceUniquePtr<nvinfer1::IExecutionContext>(mEngine->createExecutionContext());
+    if (!context)
+    {
+        return false;
+    }
+
+    // Read the input data into the managed buffers
+    assert(mParams.inputTensorNames.size() == 1);
+    if (!preprocessInput(buffers, batch))
+    {
+        return false;
+    }
+
+    // Memcpy from host input buffers to device input buffers
+    buffers.copyInputToDevice();
+
+    bool status = context->executeV2(buffers.getDeviceBindings().data());
+    if (!status)
+    {
+        return false;
+    }
+
+    // Memcpy from device output buffers to host output buffers
+    buffers.copyOutputToHost();
+
+    // Verify results
+    if (!parseOutput(buffers, detections))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+//!
 //! \brief Reads the input and stores the result in a managed buffer
 //!
 bool UltraFaceOnnx::preprocessInput(
     const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch)
 {
-    /*std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
-        "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
-        "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
-        "13_884_320_240.ppm"};
-
-    std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(batchSize);
-
-    for (int i = 0; i < batchSize; ++i)
-    {
-        auto path = locateFile(imageList[i], mParams.dataDirs);
-        std::cout << "Reading image from path " << path << endl;
-        readPPMFile(path, ppms[i]);
-    }*/
-
     // const int batchSize = mInputDims.d[0];
     const int batchSize = batch.size();
     const int inputC = mInputDims.d[1];
@@ -180,7 +211,41 @@ bool UltraFaceOnnx::preprocessInput(
             {
                 hostDataBuffer[i * volImg + c * volChl + j]
                     = (float(batch[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
-                //(float(ppms[i].buffer[j * inputC + 2 - c]) - pixelMean[c]) / 128.0;
+            }
+        }
+    }
+
+    return true;
+}
+
+//!
+//! \brief Reads the input and stores the result in a managed buffer
+//!
+bool UltraFaceOnnx::preprocessInput(
+    const inferenceCommon::BufferManager& buffers, const std::vector<cv::Mat>& batch)
+{
+    // const int batchSize = mInputDims.d[0];
+    const int batchSize = batch.size();
+    const int inputC = mInputDims.d[1];
+    const int inputH = mInputDims.d[2];
+    const int inputW = mInputDims.d[3];
+
+    float* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(mParams.inputTensorNames[0]));
+    float pixelMean[3]{127.0f, 127.0f, 127.0f};
+
+    // Host memory for input buffer
+    inference::gLogInfo << "Preprocessing image" << std::endl;
+    for (int i = 0, volImg = inputC * inputH * inputW; i < mParams.batchSize; ++i)
+    {
+        for (int c = 0; c < inputC; ++c)
+        {
+            // The color image to input should be in BGR order
+            for (unsigned j = 0, volChl = inputH * inputW; j < volChl; ++j)
+            {
+                auto y = j / inputW;
+                auto x = j % inputW;
+                hostDataBuffer[i * volImg + c * volChl + j]
+                    = (float(batch[i].at<cv::Vec3b>(y, x).val[c]) - pixelMean[c]) / 128.0;
             }
         }
     }

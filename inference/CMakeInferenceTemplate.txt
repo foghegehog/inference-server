@@ -107,6 +107,7 @@ endif()
 # Necessary to link nvinfer_plugin library.
 target_link_libraries(${TARGET_NAME}
     ${DEP_LIBS}
+    ${CUSTOM_LIBS}
     -Wl,--unresolved-symbols=ignore-in-shared-libs
 )
 

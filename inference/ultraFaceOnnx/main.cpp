@@ -21,6 +21,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <sstream>
 
 const std::string gInferenceName = "TensorRT.ultra_face_onnx";
@@ -103,23 +105,31 @@ int main(int argc, char** argv)
     std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
         "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
         "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
-        "13_884_320_240.ppm", "webcam_320_240.ppm"};
+        "13_884_320_240.ppm", "webcam_320_240.ppm", "corridor.jpg", "corridor1.jpg"};
 
-    std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(params.batchSize);
+    //std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(params.batchSize);
+    std::vector<cv::Mat> batch;
     std::vector<Detection> detections;
     auto batches = ceil(imageList.size() / params.batchSize);
     for (auto b = 0; b < batches; b++)
     {
+        batch.clear();
+        detections.clear();
         for (int i = 0; i < params.batchSize; ++i)
         {
             auto image_index = (b * params.batchSize + i) % imageList.size();
             inference::gLogInfo << "Reading image " << imageList[image_index] << std::endl;
             auto path = locateFile(imageList[image_index], params.dataDirs);
             inference::gLogInfo << "Reading image from path " << path << std::endl;
-            readPPMFile(path, ppms[i]);
+            //readPPMFile(path, ppms[i]);
+            auto image = cv::imread(path);
+            cv::Mat input_image;
+            cv::resize(image, input_image, cv::Size(320, 240));
+            batch.push_back(input_image);
         }
 
-        if (!inference.infer(ppms, detections))
+        //if (!inference.infer(ppms, detections))
+        if (!inference.infer(batch, detections))
         {
             return inference::gLogger.reportFail(inferenceTest);
         }

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <opencv2/imgcodecs.hpp>
 #include <vector>
 
 //! \brief  The UltraFaceOnnxSample class implements the ONNX UltraFace inference
@@ -39,6 +40,8 @@ public:
     //!
     bool infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, std::vector<Detection>& detections);
 
+    bool infer(const std::vector<cv::Mat>& batch, std::vector<Detection>& detections);
+
 private:
     inferenceCommon::OnnxInferenceParams mParams;
 
@@ -60,6 +63,9 @@ private:
     //!
     bool preprocessInput(
         const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch);
+
+    bool preprocessInput(
+        const inferenceCommon::BufferManager& buffers, const std::vector<cv::Mat>& batch);
 
     //!
     //! \brief Classifies digits and verify result
