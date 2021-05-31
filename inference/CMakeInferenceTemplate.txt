@@ -49,6 +49,7 @@ set(TARGET_NAME ${ENGINE_NAME})
 add_executable(${TARGET_NAME}
     ${INFERENCE_SOURCES}
     ${COMMON_SOURCES}
+    ${CUSTOM_SOURCES}
 )
 set(DEPS_LIST "")
 
