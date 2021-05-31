@@ -1,10 +1,3 @@
-//!
-//! ultraFaceOnnx.cpp
-//! It can be run with the following command line:
-//! Command: ./ultra_face_onnx [-h or --help] [-d=/path/to/data/dir or --datadir=/path/to/data/dir]
-//! [--useDLACore=<int>]
-//!
-
 #include "argsParser.h"
 #include "buffers.h"
 #include "common.h"
@@ -86,12 +79,33 @@ void handle_request(
     tcp::socket& socket,
     beast::error_code& error)
 {
+    auto inferenceTest = inference::gLogger.defineTest(gInferenceName, 0, {});
+    inference::gLogger.reportTestStart(inferenceTest);
+
+    inferenceCommon::Args args;
+    bool argsOK = inferenceCommon::parseArgs(args, 0, {});
+    auto params = initializeInferenceParams(args);
+    UltraFaceOnnx inference(params);
+
+    inference::gLogInfo << "Building and running a GPU inference engine for Onnx ultra face" << std::endl;
+
+    if (!inference.build())
+    {
+        inference::gLogger.reportFail(inferenceTest);
+        return;
+    }
+
+    inference::gLogInfo << "The GPU inference engine is build. Start streaming." << std::endl;
+
     http::response<http::empty_body> res{http::status::ok, req.version()};
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
     res.set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
     res.keep_alive();
     http::response_serializer<http::empty_body> sr{res};
     http::write_header(socket, sr);
+
+    std::vector<cv::Mat> batch;
+    std::vector<Detection> detections;
 
     std::vector<uchar> buffer;
     for (auto f = 0; f < 4410; f++)
@@ -102,16 +116,40 @@ void handle_request(
 
         auto filepath = filename_stream.str();
 
-        cv::Mat frame = cv::imread(filepath);
-        //std::cout << filename;
+        batch.clear();
+        detections.clear();
+        inference::gLogInfo << "Reading image from path " << filepath << std::endl;
+        auto frame = cv::imread(filepath);
         if (frame.empty())
         {
             std::cout << filepath << " is empty." << std::endl;
             continue;
         }
+        cv::Mat input_frame;
+        cv::resize(frame, input_frame, cv::Size(320, 240));
+        batch.push_back(input_frame);
+
+        if (!inference.infer(batch, detections))
+        {
+            inference::gLogger.reportFail(inferenceTest);
+            continue;
+        }
+
+        if (detections.empty())
+        {
+            continue;
+        }
+
+        auto detection = detections.front();
+        int width = frame.cols;
+        int height = frame.rows;
+        cv::rectangle(
+            frame,
+            cv::Point(detection.mBox[0] * width, detection.mBox[1] * height),
+            cv::Point(detection.mBox[2] * width, detection.mBox[3] * height),
+            cv::Scalar(0, 0, 255));
 
         std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 95};
-        cv::rectangle(frame, cv::Point(200, 200), cv::Point(300, 300), cv::Scalar(0, 255, 0));
         cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
         auto const size = buffer.size();
 
@@ -124,7 +162,7 @@ void handle_request(
         res.content_length(size);
         res.keep_alive(req.keep_alive());
         http::write(socket, res, error);
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
 
