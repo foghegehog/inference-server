@@ -195,8 +195,6 @@ do_session(
             return fail(ec, "read");
 
         // Send the response
-        //handle_request(*doc_root, std::move(req), lambda);
-        //handle_request(*doc_root, std::move(req), socket, close, ec);
         handle_request(std::move(req), socket, ec);
         if(ec)
             return fail(ec, "write");
@@ -219,17 +217,16 @@ int main(int argc, char** argv)
         try
     {
         // Check command line arguments.
-        if (argc != 4)
+        if (argc != 3)
         {
             std::cerr <<
-                "Usage: http-server <address> <port> <doc_root>\n" <<
+                "Usage: ultra_face_onnx <address> <port>\n" <<
                 "Example:\n" <<
-                "    http-server 0.0.0.0 8080 .\n";
+                "    ultra_face_onnx 0.0.0.0 8080\n";
             return EXIT_FAILURE;
         }
         auto const address = net::ip::make_address(argv[1]);
         auto const port = static_cast<unsigned short>(std::atoi(argv[2]));
-        auto const doc_root = std::make_shared<std::string>(argv[3]);
 
         // The io_context is required for all I/O
         net::io_context ioc{1};
@@ -255,80 +252,4 @@ int main(int argc, char** argv)
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
-    /*inferenceCommon::Args args;
-    bool argsOK = inferenceCommon::parseArgs(args, argc, argv);
-    if (!argsOK)
-    {
-        inference::gLogError << "Invalid arguments" << std::endl;
-        printHelpInfo();
-        return EXIT_FAILURE;
-    }
-    if (args.help)
-    {
-        printHelpInfo();
-        return EXIT_SUCCESS;
-    }
-
-    auto inferenceTest = inference::gLogger.defineTest(gInferenceName, argc, argv);
-
-    inference::gLogger.reportTestStart(inferenceTest);
-
-    auto params = initializeInferenceParams(args);
-    UltraFaceOnnx inference(params);
-
-    inference::gLogInfo << "Building and running a GPU inference engine for Onnx ultra face" << std::endl;
-
-    if (!inference.build())
-    {
-        return inference::gLogger.reportFail(inferenceTest);
-    }
-
-    std::vector<std::string> imageList = {"13_24_320_240.ppm", "13_50_320_240.ppm", "13_72_320_240.ppm",
-        "13_97_320_240.ppm", "13_140_320_240.ppm", "13_150_320_240.ppm", "13_178_320_240.ppm", "13_215_320_240.ppm",
-        "13_219_320_240.ppm", "13_263_320_240.ppm", "13_295_320_240.ppm", "13_312_320_240.ppm", "13_698_320_240.ppm",
-        "13_884_320_240.ppm", "webcam_320_240.ppm", "corridor.jpg", "corridor1.jpg"};
-
-    //std::vector<inferenceCommon::PPM<3, 240, 320>> ppms(params.batchSize);
-    std::vector<cv::Mat> batch;
-    std::vector<Detection> detections;
-    auto batches = ceil(imageList.size() / params.batchSize);
-    for (auto b = 0; b < batches; b++)
-    {
-        batch.clear();
-        detections.clear();
-        for (int i = 0; i < params.batchSize; ++i)
-        {
-            auto image_index = (b * params.batchSize + i) % imageList.size();
-            inference::gLogInfo << "Reading image " << imageList[image_index] << std::endl;
-            auto path = locateFile(imageList[image_index], params.dataDirs);
-            inference::gLogInfo << "Reading image from path " << path << std::endl;
-            //readPPMFile(path, ppms[i]);
-            auto image = cv::imread(path);
-            cv::Mat input_image;
-            cv::resize(image, input_image, cv::Size(320, 240));
-            batch.push_back(input_image);
-        }
-
-        //if (!inference.infer(ppms, detections))
-        if (!inference.infer(batch, detections))
-        {
-            return inference::gLogger.reportFail(inferenceTest);
-        }
-
-        array<string, 4> separators = {" ", " ", " ", ""};
-        for (const auto& d : detections)
-        {
-            inference::gLogInfo << "Detection: " << d.mScore << endl;
-            for (int corners = 4, c = 0; c < corners; c++)
-            {
-                inference::gLogInfo << d.mBox[c] << separators[c];
-            }
-
-            inference::gLogInfo << std::endl;
-        }
-
-        inference::gLogger.reportPass(inferenceTest);
-    }
-
-    return 0;*/
 }
