@@ -104,7 +104,7 @@ void handle_request(
 
         batch.clear();
         detections.clear();
-        inference::gLogInfo << "Reading image from path " << filepath << std::endl;
+        //inference::gLogInfo << "Reading image from path " << filepath << std::endl;
         auto frame = cv::imread(filepath);
         if (frame.empty())
         {

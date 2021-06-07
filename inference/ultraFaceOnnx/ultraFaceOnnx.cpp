@@ -72,10 +72,10 @@ InferenceContext UltraFaceOnnxEngine::get_inference_context()
 
     std::vector<BindingInfo> bindings;
     bindings.reserve(mEngine->getNbBindings());
-    inference::gLogInfo << "Number of bindings: " << mEngine->getNbBindings() << std::endl;
+    //inference::gLogInfo << "Number of bindings: " << mEngine->getNbBindings() << std::endl;
     for (auto i = 0; i < mEngine->getNbBindings(); i++)
     {
-        inference::gLogInfo << "Binding name: " << mEngine->getBindingName(i);
+        //inference::gLogInfo << "Binding name: " << mEngine->getBindingName(i);
         bindings.emplace_back(
             mEngine->getBindingDataType(i),
             mEngine->getBindingDimensions(i),
