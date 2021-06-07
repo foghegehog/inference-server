@@ -101,51 +101,6 @@ bool UltraFaceOnnx::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& bui
 //! \details This function is the main execution function. It allocates the buffer,
 //!          sets inputs and executes the engine.
 //!
-bool UltraFaceOnnx::infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, std::vector<Detection>& detections)
-{
-    // Create RAII buffer manager object
-    inferenceCommon::BufferManager buffers(mEngine);
-
-    auto context = InferenceUniquePtr<nvinfer1::IExecutionContext>(mEngine->createExecutionContext());
-    if (!context)
-    {
-        return false;
-    }
-
-    // Read the input data into the managed buffers
-    assert(mParams.inputTensorNames.size() == 1);
-    if (!preprocessInput(buffers, batch))
-    {
-        return false;
-    }
-
-    // Memcpy from host input buffers to device input buffers
-    buffers.copyInputToDevice();
-
-    bool status = context->executeV2(buffers.getDeviceBindings().data());
-    if (!status)
-    {
-        return false;
-    }
-
-    // Memcpy from device output buffers to host output buffers
-    buffers.copyOutputToHost();
-
-    // Verify results
-    if (!parseOutput(buffers, detections))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-//!
-//! \brief Runs the TensorRT inference engine
-//!
-//! \details This function is the main execution function. It allocates the buffer,
-//!          sets inputs and executes the engine.
-//!
 bool UltraFaceOnnx::infer(const std::vector<cv::Mat>& batch, std::vector<Detection>& detections)
 {
     // Create RAII buffer manager object
@@ -180,39 +135,6 @@ bool UltraFaceOnnx::infer(const std::vector<cv::Mat>& batch, std::vector<Detecti
     if (!parseOutput(buffers, detections))
     {
         return false;
-    }
-
-    return true;
-}
-
-//!
-//! \brief Reads the input and stores the result in a managed buffer
-//!
-bool UltraFaceOnnx::preprocessInput(
-    const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch)
-{
-    // const int batchSize = mInputDims.d[0];
-    const int batchSize = batch.size();
-    const int inputC = mInputDims.d[1];
-    const int inputH = mInputDims.d[2];
-    const int inputW = mInputDims.d[3];
-
-    float* hostDataBuffer = static_cast<float*>(buffers.getHostBuffer(mParams.inputTensorNames[0]));
-    float pixelMean[3]{127.0f, 127.0f, 127.0f};
-
-    // Host memory for input buffer
-    inference::gLogInfo << "Preprocessing image" << std::endl;
-    for (int i = 0, volImg = inputC * inputH * inputW; i < mParams.batchSize; ++i)
-    {
-        for (int c = 0; c < inputC; ++c)
-        {
-            // The color image to input should be in BGR order
-            for (unsigned j = 0, volChl = inputH * inputW; j < volChl; ++j)
-            {
-                hostDataBuffer[i * volImg + c * volChl + j]
-                    = (float(batch[i].buffer[j * inputC + c]) - pixelMean[c]) / 128.0;
-            }
-        }
     }
 
     return true;

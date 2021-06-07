@@ -1,9 +1,6 @@
 #include "argsParser.h"
-#include "buffers.h"
-#include "common.h"
 #include "detection.h"
 #include "logger.h"
-#include "parserOnnxConfig.h"
 #include "ultraFaceOnnx.h"
 
 #include "NvInfer.h"

@@ -38,8 +38,6 @@ public:
     //!
     //! \brief Runs the TensorRT inference engine
     //!
-    bool infer(std::vector<inferenceCommon::PPM<3, 240, 320>> batch, std::vector<Detection>& detections);
-
     bool infer(const std::vector<cv::Mat>& batch, std::vector<Detection>& detections);
 
 private:
@@ -57,12 +55,6 @@ private:
     bool constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder>& builder,
         InferenceUniquePtr<nvinfer1::INetworkDefinition>& network, InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
         InferenceUniquePtr<nvonnxparser::IParser>& parser);
-
-    //!
-    //! \brief Reads the input  and stores the result in a managed buffer
-    //!
-    bool preprocessInput(
-        const inferenceCommon::BufferManager& buffers, const std::vector<inferenceCommon::PPM<3, 240, 320>>& batch);
 
     bool preprocessInput(
         const inferenceCommon::BufferManager& buffers, const std::vector<cv::Mat>& batch);
