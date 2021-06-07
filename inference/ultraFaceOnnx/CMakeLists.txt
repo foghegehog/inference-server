@@ -1,4 +1,4 @@
-SET(INFERENCE_SOURCES main.cpp ultraFaceOnnx.cpp)
+SET(INFERENCE_SOURCES main.cpp ultraFaceOnnx.cpp inferenceContext.cpp)
 
 set(INFERENCE_PARSERS "onnx")
 

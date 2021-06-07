@@ -74,25 +74,14 @@ void write_response(
 void handle_request(
     http::request<http::string_body>&& req,
     tcp::socket& socket,
+    UltraFaceOnnxEngine& inferenceEngine,
     beast::error_code& error)
 {
-    auto inferenceTest = inference::gLogger.defineTest(gInferenceName, 0, {});
-    inference::gLogger.reportTestStart(inferenceTest);
+    inference::gLogInfo << "Creating inference executing context" << std::endl;
 
-    inferenceCommon::Args args;
-    bool argsOK = inferenceCommon::parseArgs(args, 0, {});
-    auto params = initializeInferenceParams(args);
-    UltraFaceOnnx inference(params);
+    auto context = inferenceEngine.get_inference_context();
 
-    inference::gLogInfo << "Building and running a GPU inference engine for Onnx ultra face" << std::endl;
-
-    if (!inference.build())
-    {
-        inference::gLogger.reportFail(inferenceTest);
-        return;
-    }
-
-    inference::gLogInfo << "The GPU inference engine is build. Start streaming." << std::endl;
+    inference::gLogInfo << "The GPU inference executing context is build. Start streaming." << std::endl;
 
     http::response<http::empty_body> res{http::status::ok, req.version()};
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -126,9 +115,9 @@ void handle_request(
         cv::resize(frame, input_frame, cv::Size(320, 240));
         batch.push_back(input_frame);
 
-        if (!inference.infer(batch, detections))
+        if (!context.infer(batch, detections))
         {
-            inference::gLogger.reportFail(inferenceTest);
+            inference::gLogInfo << "Error during inference!" << std::endl;
             continue;
         }
 
@@ -173,7 +162,8 @@ fail(beast::error_code ec, char const* what)
 // Handles an HTTP server connection
 void
 do_session(
-    tcp::socket& socket)
+    tcp::socket& socket,
+    UltraFaceOnnxEngine& engine)
 {
     bool close = false;
     beast::error_code ec;
@@ -192,7 +182,7 @@ do_session(
             return fail(ec, "read");
 
         // Send the response
-        handle_request(std::move(req), socket, ec);
+        handle_request(std::move(req), socket, engine, ec);
         if(ec)
             return fail(ec, "write");
         if(close)
@@ -225,6 +215,24 @@ int main(int argc, char** argv)
         auto const address = net::ip::make_address(argv[1]);
         auto const port = static_cast<unsigned short>(std::atoi(argv[2]));
 
+        auto inferenceTest = inference::gLogger.defineTest(gInferenceName, 0, {});
+        inference::gLogger.reportTestStart(inferenceTest);
+
+        inferenceCommon::Args args;
+        bool argsOK = inferenceCommon::parseArgs(args, 0, {});
+        auto params = initializeInferenceParams(args);
+        UltraFaceOnnxEngine inferenceEngine(params);
+
+        inference::gLogInfo << "Building and running a GPU inference engine for Onnx ultra face" << std::endl;
+
+        if (!inferenceEngine.build())
+        {
+            inference::gLogger.reportFail(inferenceTest);
+            return EXIT_FAILURE;
+        }
+
+        inference::gLogInfo << "The GPU inference engine is build." << std::endl;
+
         // The io_context is required for all I/O
         net::io_context ioc{1};
 
@@ -241,7 +249,8 @@ int main(int argc, char** argv)
             // Launch the session, transferring ownership of the socket
             std::thread{std::bind(
                 &do_session,
-                std::move(socket))}.detach();
+                std::move(socket),
+                inferenceEngine)}.detach();
         }
     }
     catch (const std::exception& e)

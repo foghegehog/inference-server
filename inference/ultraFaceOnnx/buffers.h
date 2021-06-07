@@ -1,25 +1,15 @@
-/*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #ifndef TENSORRT_BUFFERS_H
 #define TENSORRT_BUFFERS_H
 
 #include "NvInfer.h"
+
+#include "buffers.h"
+
 #include "common.h"
 #include "half.h"
+
+#include "bindingInfo.h"
+
 #include <cassert>
 #include <cuda_runtime_api.h>
 #include <iostream>
@@ -27,6 +17,7 @@
 #include <memory>
 #include <new>
 #include <numeric>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -242,32 +233,33 @@ public:
     //!
     //! \brief Create a BufferManager for handling buffer interactions with engine.
     //!
-    BufferManager(std::shared_ptr<nvinfer1::ICudaEngine> engine, const int batchSize = 0,
-        const nvinfer1::IExecutionContext* context = nullptr)
-        : mEngine(engine)
+    BufferManager(
+        //std::shared_ptr<nvinfer1::ICudaEngine> engine,
+        const nvinfer1::IExecutionContext* context,
+        std::vector<BindingInfo> bindings,
+        const int batchSize = 0)
+        : mBindings(bindings)
         , mBatchSize(batchSize)
     {
-        // Full Dims implies no batch size.
-        assert(engine->hasImplicitBatchDimension() || mBatchSize == 0);
         // Create host and device buffers
-        for (int i = 0; i < mEngine->getNbBindings(); i++)
+        for (int i = 0; i < mBindings.size(); i++)
         {
-            auto dims = context ? context->getBindingDimensions(i) : mEngine->getBindingDimensions(i);
-            size_t vol = context || !mBatchSize ? 1 : static_cast<size_t>(mBatchSize);
-            nvinfer1::DataType type = mEngine->getBindingDataType(i);
-            int vecDim = mEngine->getBindingVectorizedDim(i);
+            auto dims = context->getBindingDimensions(i);
+            size_t vol = !mBatchSize ? 1 : static_cast<size_t>(mBatchSize);
+            nvinfer1::DataType type = mBindings[i].mBindingDataType;
+            int vecDim = mBindings[i].mBindingVectorizedDim;
             if (-1 != vecDim) // i.e., 0 != lgScalarsPerVector
             {
-                int scalarsPerVec = mEngine->getBindingComponentsPerElement(i);
+                int scalarsPerVec = mBindings[i].mBindingComponentsPerElement;
                 dims.d[vecDim] = divUp(dims.d[vecDim], scalarsPerVec);
                 vol *= scalarsPerVec;
             }
             vol *= inferenceCommon::volume(dims);
-            std::unique_ptr<ManagedBuffer> manBuf{new ManagedBuffer()};
+            ManagedBuffer* manBuf = new ManagedBuffer();
             manBuf->deviceBuffer = DeviceBuffer(vol, type);
             manBuf->hostBuffer = HostBuffer(vol, type);
             mDeviceBindings.emplace_back(manBuf->deviceBuffer.data());
-            mManagedBuffers.emplace_back(std::move(manBuf));
+            mManagedBuffers.emplace_back(std::unique_ptr<ManagedBuffer>(manBuf));
         }
     }
 
@@ -306,13 +298,30 @@ public:
         return getBuffer(true, tensorName);
     }
 
+    int get_binding_index(const std::string& tensorName) const
+    {
+        int index = -1;
+        for (auto i = 0; i < mBindings.size(); i++)
+        {
+            auto binding = mBindings[i];
+            if (binding.mBindingName == tensorName)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        return index;
+    }
+
     //!
     //! \brief Returns the size of the host and device buffers that correspond to tensorName.
     //!        Returns kINVALID_SIZE_VALUE if no such tensor can be found.
     //!
     size_t size(const std::string& tensorName) const
     {
-        int index = mEngine->getBindingIndex(tensorName.c_str());
+        auto index = get_binding_index(tensorName);
+
         if (index == -1)
             return kINVALID_SIZE_VALUE;
         return mManagedBuffers[index]->hostBuffer.nbBytes();
@@ -324,7 +333,7 @@ public:
     //!
     void dumpBuffer(std::ostream& os, const std::string& tensorName)
     {
-        int index = mEngine->getBindingIndex(tensorName.c_str());
+        auto index = get_binding_index(tensorName);
         if (index == -1)
         {
             os << "Invalid tensor name" << std::endl;
@@ -332,7 +341,7 @@ public:
         }
         void* buf = mManagedBuffers[index]->hostBuffer.data();
         size_t bufSize = mManagedBuffers[index]->hostBuffer.nbBytes();
-        nvinfer1::Dims bufDims = mEngine->getBindingDimensions(index);
+        nvinfer1::Dims bufDims = mBindings[index].mBindingDimensions;
         size_t rowCount = static_cast<size_t>(bufDims.nbDims > 0 ? bufDims.d[bufDims.nbDims - 1] : mBatchSize);
         int leadDim = mBatchSize;
         int* trailDims = bufDims.d;
@@ -350,7 +359,7 @@ public:
         for (int i = 0; i < nbDims; i++)
             os << ", " << trailDims[i];
         os << "]" << std::endl;
-        switch (mEngine->getBindingDataType(index))
+        switch (mBindings[index].mBindingDataType)
         {
         case nvinfer1::DataType::kINT32: print<int32_t>(os, buf, bufSize, rowCount); break;
         case nvinfer1::DataType::kFLOAT: print<float>(os, buf, bufSize, rowCount); break;
@@ -426,7 +435,7 @@ public:
 private:
     void* getBuffer(const bool isHost, const std::string& tensorName) const
     {
-        int index = mEngine->getBindingIndex(tensorName.c_str());
+        auto index = get_binding_index(tensorName);
         if (index == -1)
             return nullptr;
         return (isHost ? mManagedBuffers[index]->hostBuffer.data() : mManagedBuffers[index]->deviceBuffer.data());
@@ -434,7 +443,7 @@ private:
 
     void memcpyBuffers(const bool copyInput, const bool deviceToHost, const bool async, const cudaStream_t& stream = 0)
     {
-        for (int i = 0; i < mEngine->getNbBindings(); i++)
+        for (int i = 0; i < mBindings.size(); i++)
         {
             void* dstPtr
                 = deviceToHost ? mManagedBuffers[i]->hostBuffer.data() : mManagedBuffers[i]->deviceBuffer.data();
@@ -442,7 +451,7 @@ private:
                 = deviceToHost ? mManagedBuffers[i]->deviceBuffer.data() : mManagedBuffers[i]->hostBuffer.data();
             const size_t byteSize = mManagedBuffers[i]->hostBuffer.nbBytes();
             const cudaMemcpyKind memcpyType = deviceToHost ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
-            if ((copyInput && mEngine->bindingIsInput(i)) || (!copyInput && !mEngine->bindingIsInput(i)))
+            if ((copyInput && mBindings[i].mIsInput) || (!copyInput && !mBindings[i].mIsInput))
             {
                 if (async)
                     CHECK(cudaMemcpyAsync(dstPtr, srcPtr, byteSize, memcpyType, stream));
@@ -452,7 +461,8 @@ private:
         }
     }
 
-    std::shared_ptr<nvinfer1::ICudaEngine> mEngine;              //!< The pointer to the engine
+    //std::shared_ptr<nvinfer1::ICudaEngine> mEngine;              //!< The pointer to the engine
+    std::vector<BindingInfo> mBindings;
     int mBatchSize;                                              //!< The batch size for legacy networks, 0 otherwise.
     std::vector<std::unique_ptr<ManagedBuffer>> mManagedBuffers; //!< The vector of pointers to managed buffers
     std::vector<void*> mDeviceBindings; //!< The vector of device buffers needed for engine execution
