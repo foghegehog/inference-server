@@ -16,14 +16,14 @@ class InferenceContext
 public:
     InferenceContext(
         nvinfer1::IExecutionContext* executionContext,
-        std::vector<BindingInfo>&& bindings,
+        std::shared_ptr<std::vector<BindingInfo>> bindings,
         nvinfer1::Dims inputDims,
         const std::string& input_name)
         :mInputName(input_name)
     {
         mExecutionContext = InferenceUniquePtr<nvinfer1::IExecutionContext>(executionContext);
         mBufferManager = std::unique_ptr<inferenceCommon::BufferManager>(
-            new inferenceCommon::BufferManager(executionContext, std::move(bindings)));
+            new inferenceCommon::BufferManager(executionContext, bindings));
         mInputDims = inputDims;
     }
 

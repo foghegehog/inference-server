@@ -231,26 +231,25 @@ public:
     static const size_t kINVALID_SIZE_VALUE = ~size_t(0);
 
     //!
-    //! \brief Create a BufferManager for handling buffer interactions with engine.
+    //! \brief Create a BufferManager for handling buffer interactions.
     //!
     BufferManager(
-        //std::shared_ptr<nvinfer1::ICudaEngine> engine,
         const nvinfer1::IExecutionContext* context,
-        std::vector<BindingInfo> bindings,
+        std::shared_ptr<std::vector<BindingInfo>> bindings,
         const int batchSize = 0)
         : mBindings(bindings)
         , mBatchSize(batchSize)
     {
         // Create host and device buffers
-        for (int i = 0; i < mBindings.size(); i++)
+        for (int i = 0; i < mBindings->size(); i++)
         {
             auto dims = context->getBindingDimensions(i);
             size_t vol = !mBatchSize ? 1 : static_cast<size_t>(mBatchSize);
-            nvinfer1::DataType type = mBindings[i].mBindingDataType;
-            int vecDim = mBindings[i].mBindingVectorizedDim;
+            nvinfer1::DataType type = mBindings->at(i).mBindingDataType;
+            int vecDim = mBindings->at(i).mBindingVectorizedDim;
             if (-1 != vecDim) // i.e., 0 != lgScalarsPerVector
             {
-                int scalarsPerVec = mBindings[i].mBindingComponentsPerElement;
+                int scalarsPerVec = mBindings->at(i).mBindingComponentsPerElement;
                 dims.d[vecDim] = divUp(dims.d[vecDim], scalarsPerVec);
                 vol *= scalarsPerVec;
             }
@@ -301,9 +300,9 @@ public:
     int get_binding_index(const std::string& tensorName) const
     {
         int index = -1;
-        for (auto i = 0; i < mBindings.size(); i++)
+        for (auto i = 0; i < mBindings->size(); i++)
         {
-            auto binding = mBindings[i];
+            auto binding = mBindings->at(i);
             if (binding.mBindingName == tensorName)
             {
                 index = i;
@@ -341,7 +340,7 @@ public:
         }
         void* buf = mManagedBuffers[index]->hostBuffer.data();
         size_t bufSize = mManagedBuffers[index]->hostBuffer.nbBytes();
-        nvinfer1::Dims bufDims = mBindings[index].mBindingDimensions;
+        nvinfer1::Dims bufDims = mBindings->at(index).mBindingDimensions;
         size_t rowCount = static_cast<size_t>(bufDims.nbDims > 0 ? bufDims.d[bufDims.nbDims - 1] : mBatchSize);
         int leadDim = mBatchSize;
         int* trailDims = bufDims.d;
@@ -359,7 +358,7 @@ public:
         for (int i = 0; i < nbDims; i++)
             os << ", " << trailDims[i];
         os << "]" << std::endl;
-        switch (mBindings[index].mBindingDataType)
+        switch (mBindings->at(index).mBindingDataType)
         {
         case nvinfer1::DataType::kINT32: print<int32_t>(os, buf, bufSize, rowCount); break;
         case nvinfer1::DataType::kFLOAT: print<float>(os, buf, bufSize, rowCount); break;
@@ -443,7 +442,7 @@ private:
 
     void memcpyBuffers(const bool copyInput, const bool deviceToHost, const bool async, const cudaStream_t& stream = 0)
     {
-        for (int i = 0; i < mBindings.size(); i++)
+        for (int i = 0; i < mBindings->size(); i++)
         {
             void* dstPtr
                 = deviceToHost ? mManagedBuffers[i]->hostBuffer.data() : mManagedBuffers[i]->deviceBuffer.data();
@@ -451,7 +450,7 @@ private:
                 = deviceToHost ? mManagedBuffers[i]->deviceBuffer.data() : mManagedBuffers[i]->hostBuffer.data();
             const size_t byteSize = mManagedBuffers[i]->hostBuffer.nbBytes();
             const cudaMemcpyKind memcpyType = deviceToHost ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
-            if ((copyInput && mBindings[i].mIsInput) || (!copyInput && !mBindings[i].mIsInput))
+            if ((copyInput && mBindings->at(i).mIsInput) || (!copyInput && !mBindings->at(i).mIsInput))
             {
                 if (async)
                     CHECK(cudaMemcpyAsync(dstPtr, srcPtr, byteSize, memcpyType, stream));
@@ -461,8 +460,7 @@ private:
         }
     }
 
-    //std::shared_ptr<nvinfer1::ICudaEngine> mEngine;              //!< The pointer to the engine
-    std::vector<BindingInfo> mBindings;
+    std::shared_ptr<std::vector<BindingInfo>> mBindings;
     int mBatchSize;                                              //!< The batch size for legacy networks, 0 otherwise.
     std::vector<std::unique_ptr<ManagedBuffer>> mManagedBuffers; //!< The vector of pointers to managed buffers
     std::vector<void*> mDeviceBindings; //!< The vector of device buffers needed for engine execution

@@ -1,6 +1,6 @@
-#include "bindingInfo.h"
 #include "logging.h"
-#include "ultraFaceOnnx.h"
+#include "../include/bindingInfo.h"
+#include "../include/ultraFaceOnnx.h"
 
 //!
 //! \brief Creates the network, configures the builder and creates the network engine
@@ -58,6 +58,22 @@ bool UltraFaceOnnxEngine::build()
 
     assert(network->getNbOutputs() == 4);
 
+    mBindings = std::make_shared<vector<BindingInfo>>();
+    mBindings->reserve(mEngine->getNbBindings());
+    //inference::gLogInfo << "Number of bindings: " << mEngine->getNbBindings() << std::endl;
+    for (auto i = 0; i < mEngine->getNbBindings(); i++)
+    {
+        //inference::gLogInfo << "Binding name: " << mEngine->getBindingName(i);
+        mBindings->emplace_back(
+            mEngine->getBindingDataType(i),
+            mEngine->getBindingDimensions(i),
+            mEngine->getBindingVectorizedDim(i),
+            mEngine->getBindingComponentsPerElement(i),
+            mEngine->getBindingName(i),
+            mEngine->bindingIsInput(i)
+        );
+    }
+
     return true;
 }
 
@@ -70,23 +86,7 @@ InferenceContext UltraFaceOnnxEngine::get_inference_context()
         throw logic_error("Failed to create execution context!");
     }
 
-    std::vector<BindingInfo> bindings;
-    bindings.reserve(mEngine->getNbBindings());
-    //inference::gLogInfo << "Number of bindings: " << mEngine->getNbBindings() << std::endl;
-    for (auto i = 0; i < mEngine->getNbBindings(); i++)
-    {
-        //inference::gLogInfo << "Binding name: " << mEngine->getBindingName(i);
-        bindings.emplace_back(
-            mEngine->getBindingDataType(i),
-            mEngine->getBindingDimensions(i),
-            mEngine->getBindingVectorizedDim(i),
-            mEngine->getBindingComponentsPerElement(i),
-            mEngine->getBindingName(i),
-            mEngine->bindingIsInput(i)
-        );
-    }
-
-    return InferenceContext(context, std::move(bindings), mInputDims, mParams.inputTensorNames[0]);
+    return InferenceContext(context, mBindings, mInputDims, mParams.inputTensorNames[0]);
 }
 
 //!

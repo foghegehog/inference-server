@@ -44,6 +44,8 @@ private:
 
     std::shared_ptr<nvinfer1::ICudaEngine> mEngine; //!< The TensorRT engine used to run the network
 
+    std::shared_ptr<std::vector<BindingInfo>> mBindings;
+
     //!
     //! \brief Parses an ONNX model for MNIST and creates a TensorRT network
     //!

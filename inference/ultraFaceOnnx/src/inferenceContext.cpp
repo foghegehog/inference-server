@@ -1,4 +1,4 @@
-#include "inferenceContext.h"
+#include "../include/inferenceContext.h"
 
 
 bool InferenceContext::infer(

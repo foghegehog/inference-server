@@ -1,7 +1,7 @@
 #include "argsParser.h"
-#include "detection.h"
 #include "logger.h"
-#include "ultraFaceOnnx.h"
+#include "../include/detection.h"
+#include "../include/ultraFaceOnnx.h"
 
 #include "NvInfer.h"
 #include <cuda_runtime_api.h>
