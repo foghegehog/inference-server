@@ -7,6 +7,7 @@
 
 #include <opencv2/imgcodecs.hpp>
 #include <memory>
+#include <set>
 #include <vector>
 
 class InferenceContext
@@ -39,6 +40,15 @@ private:
     //! \brief Classifies digits and verify result
     //!
     bool parseOutput(std::vector<Detection>& detections);
+
+    float get_intersection_area(const Detection & first, const Detection & second);
+
+    float get_iou(const Detection & first, const Detection & second);
+
+    void nms(
+        std::multiset<Detection, ScoreDescendingCompare>& all_detections,
+        std::vector<Detection>& result_detections,
+        float iou_threshold);
 
     InferenceUniquePtr<nvinfer1::IExecutionContext> mExecutionContext;
     std::unique_ptr<inferenceCommon::BufferManager> mBufferManager;

@@ -125,14 +125,16 @@ void handle_request(
             continue;
         }
 
-        auto detection = detections.front();
         int width = frame.cols;
         int height = frame.rows;
-        cv::rectangle(
-            frame,
-            cv::Point(detection.mBox[0] * width, detection.mBox[1] * height),
-            cv::Point(detection.mBox[2] * width, detection.mBox[3] * height),
-            cv::Scalar(0, 0, 255));
+        for (const auto& detection: detections)
+        {
+            cv::rectangle(
+                frame,
+                cv::Point(detection.mBox[0] * width, detection.mBox[1] * height),
+                cv::Point(detection.mBox[2] * width, detection.mBox[3] * height),
+                cv::Scalar(0, 0, 255));
+        }
 
         std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 95};
         cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});

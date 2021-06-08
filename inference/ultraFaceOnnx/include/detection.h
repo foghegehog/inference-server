@@ -14,6 +14,20 @@ struct Detection
         : mScore(score), mBox(box)
     {
     }
+
+    float get_box_area() const
+    {
+        return (mBox[2] - mBox[0]) * (mBox[3] - mBox[1]);
+    }
+
+};
+
+struct ScoreDescendingCompare
+{
+    bool operator()(const Detection& left, const Detection& right)
+    {
+        return left.mScore > right.mScore;
+    }
 };
 
 #endif
