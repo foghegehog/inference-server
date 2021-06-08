@@ -79,14 +79,16 @@ bool UltraFaceOnnxEngine::build()
 
 InferenceContext UltraFaceOnnxEngine::get_inference_context()
 {
-    // Create RAII buffer manager object
-    auto context = mEngine->createExecutionContext();
-    if (!context)
     {
-        throw logic_error("Failed to create execution context!");
-    }
+        const std::lock_guard<std::mutex> lock(mMutex);
+        auto context = mEngine->createExecutionContext();
+        if (!context)
+        {
+            throw logic_error("Failed to create execution context!");
+        }
 
-    return InferenceContext(context, mBindings, mInputDims, mParams.inputTensorNames[0]);
+        return InferenceContext(context, mBindings, mInputDims, mParams.inputTensorNames[0]);
+    }
 }
 
 //!

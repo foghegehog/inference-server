@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -250,7 +251,7 @@ int main(int argc, char** argv)
             std::thread{std::bind(
                 &do_session,
                 std::move(socket),
-                inferenceEngine)}.detach();
+                std::reference_wrapper<UltraFaceOnnxEngine>(inferenceEngine))}.detach();
         }
     }
     catch (const std::exception& e)

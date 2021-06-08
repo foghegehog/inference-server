@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <vector>
 
 //! \brief  The UltraFaceOnnxSample class implements the ONNX UltraFace inference
@@ -45,6 +46,8 @@ private:
     std::shared_ptr<nvinfer1::ICudaEngine> mEngine; //!< The TensorRT engine used to run the network
 
     std::shared_ptr<std::vector<BindingInfo>> mBindings;
+
+    std::mutex mMutex;
 
     //!
     //! \brief Parses an ONNX model for MNIST and creates a TensorRT network
