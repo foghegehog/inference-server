@@ -53,17 +53,21 @@ bool UltraFaceOnnxEngine::build()
     }
 
     assert(network->getNbInputs() == 1);
-    mInputDims = network->getInput(0)->getDimensions();
     assert(mInputDims.nbDims == 4);
-
     assert(network->getNbOutputs() == 4);
+
+    mParams->mInputDims = network->getInput(0)->getDimensions();
+    auto outputIndex = mEngine->getBindingIndex(mParams->outputTensorNames[0].c_str());
+    auto scoresDims = mEngine->getBindingDimensions(outputIndex);
+    mParams->mDetectionsCount = scoresDims.d[1];
+    mParams->mNumClasses = scoresDims.d[2];
+    //inference::gLogInfo << mParams->mDetectionsCount << std::endl;
 
     mBindings = std::make_shared<vector<BindingInfo>>();
     mBindings->reserve(mEngine->getNbBindings());
     //inference::gLogInfo << "Number of bindings: " << mEngine->getNbBindings() << std::endl;
     for (auto i = 0; i < mEngine->getNbBindings(); i++)
     {
-        //inference::gLogInfo << "Binding name: " << mEngine->getBindingName(i);
         mBindings->emplace_back(
             mEngine->getBindingDataType(i),
             mEngine->getBindingDimensions(i),
@@ -87,7 +91,7 @@ InferenceContext UltraFaceOnnxEngine::get_inference_context()
             throw logic_error("Failed to create execution context!");
         }
 
-        return InferenceContext(context, mBindings, mInputDims, mParams.inputTensorNames[0]);
+        return InferenceContext(context, mBindings, mParams);
     }
 }
 
@@ -103,7 +107,7 @@ bool UltraFaceOnnxEngine::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder
     InferenceUniquePtr<nvinfer1::INetworkDefinition>& network, InferenceUniquePtr<nvinfer1::IBuilderConfig>& config,
     InferenceUniquePtr<nvonnxparser::IParser>& parser)
 {
-    auto parsed = parser->parseFromFile(locateFile(mParams.onnxFileName, mParams.dataDirs).c_str(),
+    auto parsed = parser->parseFromFile(locateFile(mParams->onnxFileName, mParams->dataDirs).c_str(),
         static_cast<int>(inference::gLogger.getReportableSeverity()));
     if (!parsed)
     {
@@ -111,17 +115,17 @@ bool UltraFaceOnnxEngine::constructNetwork(InferenceUniquePtr<nvinfer1::IBuilder
     }
 
     config->setMaxWorkspaceSize(16_MiB);
-    if (mParams.fp16)
+    if (mParams->fp16)
     {
         config->setFlag(BuilderFlag::kFP16);
     }
-    if (mParams.int8)
+    if (mParams->int8)
     {
         config->setFlag(BuilderFlag::kINT8);
         inferenceCommon::setAllTensorScales(network.get(), 127.0f, 127.0f);
     }
 
-    inferenceCommon::enableDLA(builder.get(), config.get(), mParams.dlaCore);
+    inferenceCommon::enableDLA(builder.get(), config.get(), mParams->dlaCore);
 
     return true;
 }

@@ -2,15 +2,16 @@
 #define DETECTION_H
 
 #include <array>
+#include <algorithm>
 
 struct Detection
 {
     float mScore;
-    std::array<float, 4> mBox;
+    constexpr static const int mNumCorners = 4; 
+    std::array<float, mNumCorners> mBox;
 
-    Detection(float score, const std::array<float, 4> box)
-        : mScore(score)
-        , mBox(box)
+    Detection(float score, std::array<float, mNumCorners>&& box)
+        : mScore(score), mBox(box)
     {
     }
 };

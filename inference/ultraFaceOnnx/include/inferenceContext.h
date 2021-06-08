@@ -3,6 +3,7 @@
 
 #include "buffers.h"
 #include "detection.h"
+#include "ultraFaceInferenceParams.h"
 
 #include <opencv2/imgcodecs.hpp>
 #include <memory>
@@ -17,14 +18,12 @@ public:
     InferenceContext(
         nvinfer1::IExecutionContext* executionContext,
         std::shared_ptr<std::vector<BindingInfo>> bindings,
-        nvinfer1::Dims inputDims,
-        const std::string& input_name)
-        :mInputName(input_name)
+        std::shared_ptr<UltraFaceInferenceParams> params)
+        :mParams(params)
     {
         mExecutionContext = InferenceUniquePtr<nvinfer1::IExecutionContext>(executionContext);
         mBufferManager = std::unique_ptr<inferenceCommon::BufferManager>(
             new inferenceCommon::BufferManager(executionContext, bindings));
-        mInputDims = inputDims;
     }
 
     //!
@@ -43,8 +42,7 @@ private:
 
     InferenceUniquePtr<nvinfer1::IExecutionContext> mExecutionContext;
     std::unique_ptr<inferenceCommon::BufferManager> mBufferManager;
-    nvinfer1::Dims mInputDims;  //!< The dimensions of the input to the network.
-    std::string mInputName;
+    std::shared_ptr<UltraFaceInferenceParams> mParams;
 };
 
 #endif

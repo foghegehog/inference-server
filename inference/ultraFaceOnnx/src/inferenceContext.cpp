@@ -1,5 +1,6 @@
 #include "../include/inferenceContext.h"
 
+#include <iostream> 
 
 bool InferenceContext::infer(
     const std::vector<cv::Mat>& batch,
@@ -37,17 +38,17 @@ bool InferenceContext::infer(
 //!
 bool InferenceContext::preprocessInput(const std::vector<cv::Mat>& batch)
 {
-    // const int batchSize = mInputDims.d[0];
     const int batchSize = batch.size();
-    const int inputC = mInputDims.d[1];
-    const int inputH = mInputDims.d[2];
-    const int inputW = mInputDims.d[3];
+    const int inputC = mParams->mInputDims.d[1];
+    const int inputH = mParams->mInputDims.d[2];
+    const int inputW = mParams->mInputDims.d[3];
+    std::array<float, 3>& pixelMean = mParams->mPreprocessingMeans;
+    float pixelNorm = mParams->mPreprocessingNorm;
 
-    float* hostDataBuffer = static_cast<float*>(mBufferManager->getHostBuffer(mInputName));
-    float pixelMean[3]{127.0f, 127.0f, 127.0f};
+    float* hostDataBuffer = mBufferManager->getHostBuffer<float>(mParams->inputTensorNames[0]);
 
     // Host memory for input buffer
-    inference::gLogInfo << "Preprocessing image" << std::endl;
+    //inference::gLogInfo << "Preprocessing image" << std::endl;
     for (int i = 0, volImg = inputC * inputH * inputW; i < batchSize; ++i)
     {
         for (int c = 0; c < inputC; ++c)
@@ -58,7 +59,7 @@ bool InferenceContext::preprocessInput(const std::vector<cv::Mat>& batch)
                 auto y = j / inputW;
                 auto x = j % inputW;
                 hostDataBuffer[i * volImg + c * volChl + j]
-                    = (float(batch[i].at<cv::Vec3b>(y, x).val[c]) - pixelMean[c]) / 128.0;
+                    = (float(batch[i].at<cv::Vec3b>(y, x).val[c]) - pixelMean[c]) / pixelNorm;
             }
         }
     }
@@ -73,46 +74,26 @@ bool InferenceContext::preprocessInput(const std::vector<cv::Mat>& batch)
 //!
 bool InferenceContext::parseOutput(std::vector<Detection>& detections)
 {
-    inference::gLogInfo << "Output phase reached." << std::endl;
 
-    const float* scores = static_cast<const float*>(mBufferManager->getHostBuffer("scores"));
-    const float* boxes = static_cast<const float*>(mBufferManager->getHostBuffer("boxes"));
+    const float* scores = mBufferManager->getHostBuffer<float>("scores");
+    const float* boxes = mBufferManager->getHostBuffer<float>("boxes");
 
-    // ofstream outfile;
-    // outfile.open("13_24_320_240.txt");
-
-    for (int i = 0; i < 4420; ++i)
+    for (int i = 0; i < mParams->mDetectionsCount; ++i)
     {
-        // array<string, 4> separators = {" ", " ", " ", ""};
-        auto backScore = *(scores + i * 2);
-        auto faceScore = *(scores + i * 2 + 1);
+        auto faceScoreOffset = i * mParams->mNumClasses + mParams->mDetectionClassIndex;
+        auto faceScore = *(scores + faceScoreOffset);
 
-        // outfile << back_score << endl;
-        // outfile << face_score << endl;
-
-        const int corners = 4;
-
-        // for (int c = 0; c < corners; c++)
-        //{
-
-        // outfile << boxes[i * corners + c] << separators[c];
-        //}
-        // outfile << std::endl;
-
-        if (faceScore > 0.9)
+        if (faceScore > mParams->mDetectionThreshold)
         {
-            std::array<float, corners> box;
-            for (int c = 0; c < corners; c++)
+            std::array<float, Detection::mNumCorners> box;
+            for (int c = 0; c < box.size(); c++)
             {
-                box[c] = boxes[i * corners + c];
+                box[c] = boxes[i * box.size() + c];
             }
 
-            detections.emplace_back(faceScore, box);
-            // cout << std::endl;
+            detections.emplace_back(faceScore, std::move(box));
         }
     }
-
-    // outfile.close();
 
     return true;
 }

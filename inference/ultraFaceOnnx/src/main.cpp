@@ -1,6 +1,6 @@
-#include "argsParser.h"
 #include "logger.h"
 #include "../include/detection.h"
+#include "../include/ultraFaceInferenceParams.h"
 #include "../include/ultraFaceOnnx.h"
 
 #include "NvInfer.h"
@@ -36,24 +36,22 @@ const std::string gInferenceName = "TensorRT.ultra_face_onnx";
 //!
 //! \brief Initializes members of the params struct using the command line args
 //!
-inferenceCommon::OnnxInferenceParams initializeInferenceParams(const inferenceCommon::Args& args)
+std::shared_ptr<UltraFaceInferenceParams> initializeInferenceParams(const inferenceCommon::Args& args)
 {
-    inferenceCommon::OnnxInferenceParams params;
-    if (args.dataDirs.empty()) //!< Use default directories if user hasn't provided directory paths
-    {
-        params.dataDirs.push_back("data/ultraface/");
-    }
-    else //!< Use the data directory provided by the user
-    {
-        params.dataDirs = args.dataDirs;
-    }
-    params.onnxFileName = "ultraFace-RFB-320.onnx";
-    params.inputTensorNames.push_back("input");
-    params.outputTensorNames.push_back("scores");
-    params.outputTensorNames.push_back("boxes");
-    params.dlaCore = args.useDLACore;
-    params.int8 = args.runInInt8;
-    params.fp16 = args.runInFp16;
+    auto params = std::make_shared<UltraFaceInferenceParams>();
+    params->dataDirs.push_back("data/ultraface/");
+    params->onnxFileName = "ultraFace-RFB-320.onnx";
+    params->inputTensorNames.push_back("input");
+    params->outputTensorNames.push_back("scores");
+    params->outputTensorNames.push_back("boxes");
+    params->mPreprocessingMeans = {127.0f, 127.0f, 127.0f};
+    params->mPreprocessingNorm = 128.0f;
+    params->mDetectionThreshold = 0.9;
+    params->mNumClasses = 2;
+    params->mDetectionClassIndex = 1;
+    params->dlaCore = args.useDLACore;
+    params->int8 = args.runInInt8;
+    params->fp16 = args.runInFp16;
 
     return params;
 }

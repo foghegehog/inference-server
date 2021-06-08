@@ -290,9 +290,10 @@ public:
     //! \brief Returns the host buffer corresponding to tensorName.
     //!        Returns nullptr if no such tensor can be found.
     //!
-    void* getHostBuffer(const std::string& tensorName) const
+    template <typename T>
+    T* getHostBuffer(const std::string& tensorName) const
     {
-        return getBuffer(true, tensorName);
+        return static_cast<T*>(getBuffer(true, tensorName));
     }
 
     int get_binding_index(const std::string& tensorName) const

@@ -7,6 +7,7 @@
 #include "detection.h"
 #include "inferenceContext.h"
 #include "parserOnnxConfig.h"
+#include "ultraFaceInferenceParams.h"
 
 #include <array>
 #include <cstdlib>
@@ -25,7 +26,7 @@ class UltraFaceOnnxEngine
     using InferenceUniquePtr = std::unique_ptr<T, inferenceCommon::InferDeleter>;
 
 public:
-    UltraFaceOnnxEngine(const inferenceCommon::OnnxInferenceParams& params)
+    UltraFaceOnnxEngine(std::shared_ptr<UltraFaceInferenceParams> params)
         : mParams(params)
         , mEngine(nullptr)
     {
@@ -39,7 +40,7 @@ public:
     InferenceContext get_inference_context();
 
 private:
-    inferenceCommon::OnnxInferenceParams mParams;
+    std::shared_ptr<UltraFaceInferenceParams> mParams;
 
     nvinfer1::Dims mInputDims;  //!< The dimensions of the input to the network.
 
