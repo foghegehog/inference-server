@@ -1,7 +1,7 @@
 #include "logger.h"
-#include "../include/detection.h"
-#include "../include/ultraFaceInferenceParams.h"
-#include "../include/ultraFaceOnnx.h"
+#include "../include/inference/detection.h"
+#include "../include/inference/ultraFaceInferenceParams.h"
+#include "../include/inference/ultraFaceOnnx.h"
 
 #include "NvInfer.h"
 #include <cuda_runtime_api.h>

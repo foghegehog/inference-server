@@ -1,6 +1,6 @@
 #include "logging.h"
-#include "../include/bindingInfo.h"
-#include "../include/ultraFaceOnnx.h"
+#include "../../include/inference/bindingInfo.h"
+#include "../../include/inference/ultraFaceOnnx.h"
 
 //!
 //! \brief Creates the network, configures the builder and creates the network engine
