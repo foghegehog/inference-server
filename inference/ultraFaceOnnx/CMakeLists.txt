@@ -1,4 +1,10 @@
-SET(INFERENCE_SOURCES src/main.cpp src/inference/ultraFaceOnnx.cpp src/inference/inferenceContext.cpp)
+SET(INFERENCE_SOURCES 
+    src/main.cpp
+    src/inference/ultraFaceOnnx.cpp
+    src/inference/inferenceContext.cpp
+    src/inference/http/lib.cpp
+    src/inference/http/listener.cpp
+    src/inference/http/session.cpp)
 
 set(INFERENCE_PARSERS "onnx")
 

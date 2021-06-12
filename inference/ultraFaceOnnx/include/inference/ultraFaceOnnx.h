@@ -37,7 +37,7 @@ public:
     //!
     bool build();
 
-    InferenceContext get_inference_context();
+    std::unique_ptr<InferenceContext> get_inference_context();
 
 private:
     std::shared_ptr<UltraFaceInferenceParams> mParams;

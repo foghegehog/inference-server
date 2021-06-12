@@ -81,7 +81,7 @@ bool UltraFaceOnnxEngine::build()
     return true;
 }
 
-InferenceContext UltraFaceOnnxEngine::get_inference_context()
+std::unique_ptr<InferenceContext> UltraFaceOnnxEngine::get_inference_context()
 {
     {
         const std::lock_guard<std::mutex> lock(mMutex);
@@ -91,7 +91,7 @@ InferenceContext UltraFaceOnnxEngine::get_inference_context()
             throw logic_error("Failed to create execution context!");
         }
 
-        return InferenceContext(context, mBindings, mParams);
+        return std::unique_ptr<InferenceContext>(context, mBindings, mParams);
     }
 }
 
