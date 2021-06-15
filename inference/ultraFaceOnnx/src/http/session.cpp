@@ -3,12 +3,13 @@
 
 #include <functional> 
 #include <boost/asio.hpp>
-#include <boost/beast/websocket.hpp>
+#include <boost/beast/http/write.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <sstream>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
+using tcp = boost::asio::ip::tcp;
 
 void session::run()
 {
@@ -20,6 +21,8 @@ void session::do_read()
     // Make the request empty before reading,
     // otherwise the operation behavior is undefined.
     m_req = {};
+
+    log("Started reading socket");
 
     // Read a request
     http::async_read(m_socket, m_buffer, m_req,
@@ -51,19 +54,20 @@ void session::on_read(
 
     inference::gLogInfo << "Start streaming the GPU inference results." << std::endl;
 
-    http::response<http::empty_body> res{http::status::ok, req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
-    res.keep_alive();
+    m_header_res = std::make_shared<http::response<http::empty_body>>(http::status::ok, m_req.version());
+    m_header_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    m_header_res->set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
+    m_header_res->keep_alive();
 
     // The lifetime of the response has to extend
     // for the duration of the async operation so
     // we use a shared_ptr to manage it.
-    auto sr = std::make_shared<http::response_serializer<http::empty_body>>(res);
+    //m_header_serializer.reset(new http::response_serializer<http::empty_body>(res));
 
-    http::async_write_header(
-        socket,
-        sr,
+    log("Writing M-JPEG header.");
+    http::async_write(
+        m_socket,
+        *m_header_res,
         boost::asio::bind_executor(
             m_strand,
             std::bind(
@@ -74,10 +78,10 @@ void session::on_read(
                 0)));
 }
 
-void on_write(
+void session::on_write(
     boost::system::error_code ec,
     std::size_t bytes_transferred,
-    size_t frames_send)
+    int frames_send)
 {
     boost::ignore_unused(bytes_transferred);
 
@@ -101,6 +105,7 @@ void on_write(
     do
     {
         frame_num += 1;
+        log("Handling next frame.");
         std::stringstream filename_stream;
         filename_stream <<  m_base_folder;
         filename_stream << std::setw(8) << std::setfill('0') << std::to_string(frame_num) << ".jpg"; 
@@ -116,16 +121,20 @@ void on_write(
         }
         
         cv::resize(frame, input_frame, cv::Size(320, 240));
-        batch.push_back(input_frame);
+        batch.clear();
+        batch.push_back(std::move(input_frame));
 
-        if (!context.infer(batch, detections))
+        inference::gLogInfo << "Running inference!" << std::endl;
+        if (!m_inference_context->infer(batch, detections))
         {
             inference::gLogInfo << "Error during inference!" << std::endl;
             continue;
         }
+        inference::gLogInfo << "Inference successfull." << std::endl;
     }
     while(detections.empty() && (frame_num < total_frames));
 
+    inference::gLogInfo << "Drawing detections." << std::endl;
     int width = frame.cols;
     int height = frame.rows;
     for (const auto& detection: detections)
@@ -138,25 +147,27 @@ void on_write(
     }
 
     std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 95};
+    std::vector<uchar> buffer;
     cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
     auto const size = buffer.size();
 
-   auto res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
+    inference::gLogInfo << "Writing response."  << std::endl;
+    m_res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
         std::piecewise_construct,
         std::make_tuple(std::move(buffer)),
-        std::make_tuple(http::status::ok, req.version()));
-    res->set(http::field::body, "--frame");
-    res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res->set(http::field::content_type, "image/jpeg");
-    res->content_length(size);
-    res->keep_alive(req.keep_alive());
+        std::make_tuple(http::status::ok, m_req.version()));
+    m_res->set(http::field::body, "--frame");
+    m_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    m_res->set(http::field::content_type, "image/jpeg");
+    m_res->content_length(size);
+    m_res->keep_alive(m_req.keep_alive());
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     // Write the response
     http::async_write(
         m_socket,
-        *res,
+        *m_res,
         boost::asio::bind_executor(
             m_strand,
             std::bind(
@@ -165,7 +176,6 @@ void on_write(
                 std::placeholders::_1,
                 std::placeholders::_2,
                 frame_num)));
-    
 }
 
 void session::do_close()

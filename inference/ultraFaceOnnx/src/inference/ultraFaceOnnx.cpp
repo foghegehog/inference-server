@@ -91,7 +91,7 @@ std::unique_ptr<InferenceContext> UltraFaceOnnxEngine::get_inference_context()
             throw logic_error("Failed to create execution context!");
         }
 
-        return std::unique_ptr<InferenceContext>(context, mBindings, mParams);
+        return std::unique_ptr<InferenceContext>(new InferenceContext(context, mBindings, mParams));
     }
 }
 

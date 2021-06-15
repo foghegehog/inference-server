@@ -22,8 +22,12 @@ class session : public std::enable_shared_from_this<session>
 
     std::unique_ptr<InferenceContext> m_inference_context;
 
-    http::request<http::string_body> m_req;
-    std::shared_ptr<void> m_res;
+    boost::beast::http::request<boost::beast::http::string_body> m_req;
+
+    std::shared_ptr<boost::beast::http::response<boost::beast::http::empty_body>> m_header_res;
+
+    std::shared_ptr<boost::beast::http::response<boost::beast::http::vector_body<unsigned char>>> m_res;
+    
 
     const std::string m_base_folder = "../../data/ultraface/corridor/";
 
@@ -34,7 +38,7 @@ public:
         std::unique_ptr<InferenceContext>&& inference_context)
         : m_socket(std::move(socket)),
         m_strand(m_socket.get_executor()),
-        m_inference_context(inference_context)
+        m_inference_context(std::move(inference_context))
     {
     }
 
@@ -51,7 +55,7 @@ private:
     void on_write(
         boost::system::error_code ec,
         std::size_t bytes_transferred,
-        size_t frames_send);
+        int frames_send);
 
     void do_close();
 };

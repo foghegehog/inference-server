@@ -5,4 +5,6 @@
 
 void fail(boost::system::error_code ec, char const* what);
 
+void log(char const* message);
+
 #endif

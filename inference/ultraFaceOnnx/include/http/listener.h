@@ -1,8 +1,11 @@
 #ifndef LISTENER_H
 #define LISTENER_H
 
+#include "../inference/ultraFaceOnnx.h"
+
 #include <boost/asio/dispatch.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/core.hpp>
 
 #include <memory>
 
@@ -11,11 +14,13 @@
 class listener : public std::enable_shared_from_this<listener>
 {
     boost::asio::ip::tcp::acceptor m_acceptor;
-    tcp::socket m_socket;
+    boost::asio::ip::tcp::socket m_socket;
+    UltraFaceOnnxEngine& m_inference_engine;
 
 public:
     listener(boost::asio::io_context& ioc,
-        tcp::endpoint endpoint);
+        boost::asio::ip::tcp::endpoint endpoint,
+        UltraFaceOnnxEngine& inferenceEngine);
 
     // Start accepting incoming connections
     void run();
@@ -23,7 +28,7 @@ public:
 private:
     void do_accept();
 
-    void on_accept(beast::error_code ec, tcp::socket socket);
+    void on_accept(boost::beast::error_code ec);
 };
 
 #endif

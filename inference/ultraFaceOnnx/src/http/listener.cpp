@@ -1,6 +1,7 @@
 #include "../../include/http/lib.h"
 #include "../../include/http/listener.h"
 #include "../../include/http/session.h"
+#include "../../include/inference/ultraFaceOnnx.h"
 
 #include <boost/beast/http.hpp>
 #include <boost/asio/strand.hpp>
@@ -11,10 +12,13 @@ namespace http = beast::http;
 namespace net = boost::asio;
 using tcp = boost::asio::ip::tcp;
 
-listener::listener(boost::asio::io_context& ioc,
-        tcp::endpoint endpoint)
+listener::listener(
+    boost::asio::io_context& ioc,
+    tcp::endpoint endpoint,
+    UltraFaceOnnxEngine& inferenceEngine)
     :m_acceptor(ioc),
-    m_socket(ioc)
+    m_socket(ioc),
+    m_inference_engine(inferenceEngine)
 {
     beast::error_code ec;
 
@@ -63,6 +67,7 @@ void listener::run()
 
 void listener::do_accept()
 {
+    log("Started to accept connections.");
     // The new connection gets its own strand
     m_acceptor.async_accept(
         m_socket,
@@ -72,7 +77,7 @@ void listener::do_accept()
             std::placeholders::_1));
 }
 
-void listener::on_accept(beast::error_code ec, tcp::socket socket)
+void listener::on_accept(beast::error_code ec)
 {
     if(ec)
     {
@@ -81,7 +86,7 @@ void listener::on_accept(beast::error_code ec, tcp::socket socket)
     else
     {
         // Create the session and run it
-        std::make_shared<session>(std::move(m_socket))->run();
+        std::make_shared<session>(std::move(m_socket), m_inference_engine.get_inference_context())->run();
     }
 
     // Accept another connection

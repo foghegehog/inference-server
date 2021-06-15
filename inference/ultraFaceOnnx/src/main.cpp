@@ -2,6 +2,7 @@
 #include "../include/inference/detection.h"
 #include "../include/inference/ultraFaceInferenceParams.h"
 #include "../include/inference/ultraFaceOnnx.h"
+#include "../include/http/listener.h"
 
 #include "NvInfer.h"
 #include <cuda_runtime_api.h>
@@ -70,7 +71,7 @@ void write_response(
     http::write(stream, sr, ec);
 }
 
-void handle_request(
+/*void handle_request(
     http::request<http::string_body>&& req,
     tcp::socket& socket,
     UltraFaceOnnxEngine& inferenceEngine,
@@ -114,7 +115,7 @@ void handle_request(
         cv::resize(frame, input_frame, cv::Size(320, 240));
         batch.push_back(input_frame);
 
-        if (!context.infer(batch, detections))
+        if (!context->infer(batch, detections))
         {
             inference::gLogInfo << "Error during inference!" << std::endl;
             continue;
@@ -199,7 +200,7 @@ do_session(
 
     // At this point the connection is closed gracefully
 }
-
+*/
 int main(int argc, char** argv)
 {
         try
@@ -237,8 +238,16 @@ int main(int argc, char** argv)
         // The io_context is required for all I/O
         net::io_context ioc{1};
 
+        // Create and launch a listening port
+        std::make_shared<listener>(
+            ioc,
+            tcp::endpoint{address, port},
+            inferenceEngine)->run();
+
+        ioc.run();
+
         // The acceptor receives incoming connections
-        tcp::acceptor acceptor{ioc, {address, port}};
+/*        tcp::acceptor acceptor{ioc, {address, port}};
         for(;;)
         {
             // This will receive the new connection
@@ -252,7 +261,7 @@ int main(int argc, char** argv)
                 &do_session,
                 std::move(socket),
                 std::reference_wrapper<UltraFaceOnnxEngine>(inferenceEngine))}.detach();
-        }
+        }*/
     }
     catch (const std::exception& e)
     {
