@@ -18,6 +18,7 @@ listener::listener(
     UltraFaceOnnxEngine& inferenceEngine)
     :m_acceptor(ioc),
     m_socket(ioc),
+    m_ioc(ioc),
     m_inference_engine(inferenceEngine)
 {
     beast::error_code ec;
@@ -86,7 +87,10 @@ void listener::on_accept(beast::error_code ec)
     else
     {
         // Create the session and run it
-        std::make_shared<session>(std::move(m_socket), m_inference_engine.get_inference_context())->run();
+        std::make_shared<session>(
+            m_ioc,
+            std::move(m_socket),
+            m_inference_engine.get_inference_context())->run();
     }
 
     // Accept another connection

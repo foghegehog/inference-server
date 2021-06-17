@@ -3,6 +3,7 @@
 
 #include <functional> 
 #include <boost/asio.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/beast/http/write.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <sstream>
@@ -54,15 +55,13 @@ void session::on_read(
 
     inference::gLogInfo << "Start streaming the GPU inference results." << std::endl;
 
+    // The lifetime of the response has to extend
+    // for the duration of the async operation so
+    // we use a shared_ptr to manage it.
     m_header_res = std::make_shared<http::response<http::empty_body>>(http::status::ok, m_req.version());
     m_header_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
     m_header_res->set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
     m_header_res->keep_alive();
-
-    // The lifetime of the response has to extend
-    // for the duration of the async operation so
-    // we use a shared_ptr to manage it.
-    //m_header_serializer.reset(new http::response_serializer<http::empty_body>(res));
 
     log("Writing M-JPEG header.");
     http::async_write(
@@ -83,6 +82,8 @@ void session::on_write(
     std::size_t bytes_transferred,
     int frames_send)
 {
+    auto processing_start = std::chrono::high_resolution_clock::now();
+
     boost::ignore_unused(bytes_transferred);
 
     if(ec)
@@ -162,9 +163,28 @@ void session::on_write(
     m_res->content_length(size);
     m_res->keep_alive(m_req.keep_alive());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    //std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
-    // Write the response
+    auto processing_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = processing_end - processing_start;
+     using nano_duration = std::chrono::duration<int, std::nano>;
+    auto pause = std::chrono::duration_cast<nano_duration>(m_frame_pause - elapsed);
+    log(std::to_string(pause.count()));
+    m_timer.expires_after(pause);
+    m_timer.async_wait(
+        boost::asio::bind_executor(
+            m_strand,
+            std::bind(
+                &session::on_timer,
+                shared_from_this(),
+                std::placeholders::_1,
+                frame_num)));
+}
+
+void session::on_timer(const boost::system::error_code& error, int frame_num)
+{
+    log("On timer pause");
+       // Write the response
     http::async_write(
         m_socket,
         *m_res,

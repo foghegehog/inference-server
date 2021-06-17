@@ -5,9 +5,13 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/strand.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include <boost/beast/websocket.hpp>
+#include <boost/beast/version.hpp>
+
+#include <chrono>
 
 #include <functional>
 #include <memory>
@@ -28,16 +32,20 @@ class session : public std::enable_shared_from_this<session>
 
     std::shared_ptr<boost::beast::http::response<boost::beast::http::vector_body<unsigned char>>> m_res;
     
+    const std::chrono::milliseconds m_frame_pause = std::chrono::milliseconds(40);
+
+    boost::asio::steady_timer m_timer;
 
     const std::string m_base_folder = "../../data/ultraface/corridor/";
 
 public:
     // Take ownership of the stream
-    session(
+    session(boost::asio::io_context& ioc,
         boost::asio::ip::tcp::socket socket,
         std::unique_ptr<InferenceContext>&& inference_context)
         : m_socket(std::move(socket)),
         m_strand(m_socket.get_executor()),
+        m_timer(ioc),
         m_inference_context(std::move(inference_context))
     {
     }
@@ -56,6 +64,8 @@ private:
         boost::system::error_code ec,
         std::size_t bytes_transferred,
         int frames_send);
+
+    void on_timer(const boost::system::error_code& error, int frame_num);
 
     void do_close();
 };

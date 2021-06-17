@@ -15,6 +15,7 @@ class listener : public std::enable_shared_from_this<listener>
 {
     boost::asio::ip::tcp::acceptor m_acceptor;
     boost::asio::ip::tcp::socket m_socket;
+    boost::asio::io_context& m_ioc;
     UltraFaceOnnxEngine& m_inference_engine;
 
 public:
