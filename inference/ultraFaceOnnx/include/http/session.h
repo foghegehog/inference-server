@@ -2,6 +2,7 @@
 #define SESSION_H
 
 #include "../inference/inferenceContext.h"
+#include "../statistics.h"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/strand.hpp>
@@ -15,6 +16,7 @@
 
 #include <functional>
 #include <memory>
+#include <queue>
 #include <string>
 
 // Handles an HTTP server connection
@@ -32,9 +34,13 @@ class session : public std::enable_shared_from_this<session>
 
     std::shared_ptr<boost::beast::http::response<boost::beast::http::vector_body<unsigned char>>> m_res;
     
-    const std::chrono::milliseconds m_frame_pause = std::chrono::milliseconds(40);
+    std::queue<std::vector<uchar>> m_frame_buffers;
 
     boost::asio::steady_timer m_timer;
+
+    const std::chrono::nanoseconds m_frame_pause = std::chrono::nanoseconds(40000000);
+
+    statistics m_statistics;
 
     const std::string m_base_folder = "../../data/ultraface/corridor/";
 
@@ -63,11 +69,13 @@ private:
     void on_write(
         boost::system::error_code ec,
         std::size_t bytes_transferred,
-        int frames_send);
+        int frames_processed);
 
-    void on_timer(const boost::system::error_code& error, int frame_num);
+    void on_timer(const boost::system::error_code& error, int frames_processed);
 
     void do_close();
+
+    int process_frame(int frames_send, int total_frames);
 };
 
 #endif

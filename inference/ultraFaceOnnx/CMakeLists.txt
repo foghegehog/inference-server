@@ -4,7 +4,8 @@ SET(INFERENCE_SOURCES
     src/inference/inferenceContext.cpp
     src/http/lib.cpp
     src/http/listener.cpp
-    src/http/session.cpp)
+    src/http/session.cpp
+    src/statistics.cpp)
 
 set(INFERENCE_PARSERS "onnx")
 
