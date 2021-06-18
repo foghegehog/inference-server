@@ -87,7 +87,7 @@ void session::on_write(
         return fail(ec, "write");
     }
 
-    if (m_files_iterator.is_finished())
+    if (m_files_iterator.is_finished() && m_frame_buffers.empty())
     {
         log("Closing");
         do_close();
@@ -121,6 +121,13 @@ void session::on_write(
     } while (!m_files_iterator.is_finished()
         && (pause.count() > m_statistics.get_avg_processing_time()));
 
+    if (m_files_iterator.is_finished())
+    {
+        // Denotes end of images list
+        log("Image list finished.");
+        m_frame_buffers.push(std::vector<uchar>());
+    }
+
     m_timer.expires_after(pause);
     m_timer.async_wait(
         boost::asio::bind_executor(
@@ -137,16 +144,32 @@ void session::on_timer(const boost::system::error_code& error)
     m_frame_buffers.pop();
     auto const size = buffer.size();
 
-    log("Writing response.");
-    m_res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
+    std::cout << "Buffer size: " << size << std::endl;
+
+    if (size == 0)
+    {
+        // Writing termination boundary
+        log("Writing termination boundary.");
+        m_res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
         std::piecewise_construct,
         std::make_tuple(std::move(buffer)),
         std::make_tuple(http::status::ok, m_req.version()));
-    m_res->set(http::field::body, "--frame");
-    m_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    m_res->set(http::field::content_type, "image/jpeg");
-    m_res->content_length(size);
-    m_res->keep_alive(m_req.keep_alive());
+        m_res->content_length(0);
+        m_res->set(http::field::body, "--frame--");
+    }
+    else
+    {
+        log("Writing response.");
+        m_res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
+        std::piecewise_construct,
+        std::make_tuple(std::move(buffer)),
+        std::make_tuple(http::status::ok, m_req.version()));
+        m_res->set(http::field::body, "--frame");
+        m_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        m_res->set(http::field::content_type, "image/jpeg");
+        m_res->content_length(size);
+        m_res->keep_alive(m_req.keep_alive());
+    }
 
     // Write the response
     http::async_write(
@@ -166,6 +189,7 @@ void session::do_close()
     // Send a TCP shutdown
     boost::system::error_code ec;
     m_socket.shutdown(tcp::socket::shutdown_send, ec);
+    m_socket.close();
 
     // At this point the connection is closed gracefully
 }
