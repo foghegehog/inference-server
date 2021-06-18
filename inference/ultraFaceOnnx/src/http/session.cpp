@@ -73,14 +73,12 @@ void session::on_read(
                 &session::on_write,
                 shared_from_this(),
                 std::placeholders::_1,
-                std::placeholders::_2,
-                0)));
+                std::placeholders::_2)));
 }
 
 void session::on_write(
     boost::system::error_code ec,
-    std::size_t bytes_transferred,
-    int frames_processed)
+    std::size_t bytes_transferred)
 {    
     boost::ignore_unused(bytes_transferred);
 
@@ -89,8 +87,7 @@ void session::on_write(
         return fail(ec, "write");
     }
 
-    const int total_frames = 4410;
-    if (frames_processed >= total_frames)
+    if (m_files_iterator.is_finished())
     {
         log("Closing");
         do_close();
@@ -106,24 +103,23 @@ void session::on_write(
                 std::bind(
                     &session::on_timer,
                     shared_from_this(),
-                    std::placeholders::_1,
-                    frames_processed)));
+                    std::placeholders::_1)));
 
         return;
     }
 
-    int frame_num = frames_processed;
     auto pause = m_frame_pause;
+    log("Start processing frames.");
     do
     {
         auto processing_start = std::chrono::high_resolution_clock::now();
-        frame_num += 1;
-        frame_num = process_frame(frame_num, total_frames);
+        process_frame();
         auto processing_end = std::chrono::high_resolution_clock::now();
         auto processing_time = processing_end - processing_start;
         m_statistics.update_avg_processing(processing_time.count());
         pause -= processing_time;
-    } while (pause.count() > m_statistics.get_avg_processing_time());
+    } while (!m_files_iterator.is_finished()
+        && (pause.count() > m_statistics.get_avg_processing_time()));
 
     m_timer.expires_after(pause);
     m_timer.async_wait(
@@ -132,13 +128,12 @@ void session::on_write(
             std::bind(
                 &session::on_timer,
                 shared_from_this(),
-                std::placeholders::_1,
-                frame_num)));
+                std::placeholders::_1)));
 }
 
-void session::on_timer(const boost::system::error_code& error, int frames_processed)
+void session::on_timer(const boost::system::error_code& error)
 {
-    auto buffer = m_frame_buffers.front();
+    auto buffer = std::move(m_frame_buffers.front());
     m_frame_buffers.pop();
     auto const size = buffer.size();
 
@@ -163,8 +158,7 @@ void session::on_timer(const boost::system::error_code& error, int frames_proces
                 &session::on_write,
                 shared_from_this(),
                 std::placeholders::_1,
-                std::placeholders::_2,
-                frames_processed)));
+                std::placeholders::_2)));
 }
 
 void session::do_close()
@@ -176,29 +170,23 @@ void session::do_close()
     // At this point the connection is closed gracefully
 }
 
-int session::process_frame(int frames_send, int total_frames)
+void session::process_frame()
 {
-    int frame_num = frames_send; 
     cv::Mat frame;
     cv::Mat input_frame;
     std::vector<cv::Mat> batch;
     std::vector<Detection> detections;
 
+    bool finished = false;
     do
     {
-        frame_num += 1;
-        log("Handling next frame.");
-        std::stringstream filename_stream;
-        filename_stream <<  m_base_folder;
-        filename_stream << std::setw(8) << std::setfill('0') << std::to_string(frame_num) << ".jpg"; 
-
-        auto filepath = filename_stream.str();
+        auto filepath = m_files_iterator.get_file_path();
 
         inference::gLogInfo << "Reading image from path " << filepath << std::endl;
         frame = cv::imread(filepath);
         if (frame.empty())
         {
-            std::cout << filepath << " is empty." << std::endl;
+            log(filepath + " is empty.");
             continue;
         }
         
@@ -214,7 +202,7 @@ int session::process_frame(int frames_send, int total_frames)
         }
         inference::gLogInfo << "Inference successfull." << std::endl;
 
-            inference::gLogInfo << "Drawing detections." << std::endl;
+        inference::gLogInfo << "Drawing detections." << std::endl;
         int width = frame.cols;
         int height = frame.rows;
         for (const auto& detection: detections)
@@ -230,8 +218,11 @@ int session::process_frame(int frames_send, int total_frames)
         std::vector<uchar> buffer;
         cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
         m_frame_buffers.push(std::move(buffer));
-    }
-    while(detections.empty() && (frame_num < total_frames));
+        inference::gLogInfo << "Frame ready." << std::endl;
 
-    return frame_num;
+        finished = m_files_iterator.move_next();
+    }
+    while(detections.empty() && !finished);
+    
+    log("Finished processing frame.");
 }

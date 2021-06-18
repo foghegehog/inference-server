@@ -2,6 +2,7 @@
 #define SESSION_H
 
 #include "../inference/inferenceContext.h"
+#include "../files_iterator.h"
 #include "../statistics.h"
 
 #include <boost/asio/ip/tcp.hpp>
@@ -44,6 +45,8 @@ class session : public std::enable_shared_from_this<session>
 
     const std::string m_base_folder = "../../data/ultraface/corridor/";
 
+    files_iterator m_files_iterator;
+
 public:
     // Take ownership of the stream
     session(boost::asio::io_context& ioc,
@@ -52,6 +55,7 @@ public:
         : m_socket(std::move(socket)),
         m_strand(m_socket.get_executor()),
         m_timer(ioc),
+        m_files_iterator(m_base_folder, ".jpg"),
         m_inference_context(std::move(inference_context))
     {
     }
@@ -68,14 +72,13 @@ private:
 
     void on_write(
         boost::system::error_code ec,
-        std::size_t bytes_transferred,
-        int frames_processed);
+        std::size_t bytes_transferred);
 
-    void on_timer(const boost::system::error_code& error, int frames_processed);
+    void on_timer(const boost::system::error_code& error);
 
     void do_close();
 
-    int process_frame(int frames_send, int total_frames);
+    void process_frame();
 };
 
 #endif
