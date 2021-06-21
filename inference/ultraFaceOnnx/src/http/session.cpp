@@ -1,12 +1,15 @@
 #include "../../include/http/session.h"
 #include "../../include/http/lib.h"
+#include "../../include/http/query.h"
 
 #include <functional> 
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/beast/http/write.hpp>
+#include <boost/regex.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <sstream>
+
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -52,7 +55,7 @@ void session::on_read(
     {
         fail(ec, "read");
     }
-
+    
     inference::gLogInfo << "Start streaming the GPU inference results." << std::endl;
 
     // The lifetime of the response has to extend

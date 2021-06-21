@@ -5,13 +5,14 @@ SET(INFERENCE_SOURCES
     src/http/lib.cpp
     src/http/listener.cpp
     src/http/session.cpp
+    src/http/query.cpp
     src/statistics.cpp
     src/files_iterator.cpp)
 
 set(INFERENCE_PARSERS "onnx")
 
 find_package( OpenCV REQUIRED )
-find_package(Boost COMPONENTS thread system filesystem REQUIRED)
+find_package(Boost COMPONENTS thread system filesystem regex REQUIRED)
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
