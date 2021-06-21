@@ -47,6 +47,8 @@ class session : public std::enable_shared_from_this<session>
 
     files_iterator m_files_iterator;
 
+    const std::string m_frame_boundary = "frame";
+
 public:
     // Take ownership of the stream
     session(boost::asio::io_context& ioc,

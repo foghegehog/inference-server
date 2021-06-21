@@ -60,7 +60,9 @@ void session::on_read(
     // we use a shared_ptr to manage it.
     m_header_res = std::make_shared<http::response<http::empty_body>>(http::status::ok, m_req.version());
     m_header_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    m_header_res->set(http::field::content_type, "multipart/x-mixed-replace; boundary=frame");
+    m_header_res->set(
+        http::field::content_type,
+        "multipart/x-mixed-replace; boundary=" + m_frame_boundary);
     m_header_res->keep_alive();
 
     log("Writing M-JPEG header.");
@@ -148,12 +150,21 @@ void session::on_timer(const boost::system::error_code& error)
     {
         // Writing termination boundary
         log("Writing termination boundary.");
-        m_res = std::make_shared<http::response<http::vector_body<unsigned char>>>(
-        std::piecewise_construct,
-        std::make_tuple(std::move(buffer)),
-        std::make_tuple(http::status::ok, m_req.version()));
-        m_res->content_length(0);
-        m_res->set(http::field::body, "--frame--");
+
+        m_header_res = std::make_shared<http::response<http::empty_body>>(http::status::ok, m_req.version());
+        m_header_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        m_header_res->set(http::field::body, "--" + m_frame_boundary + "--");
+
+        http::async_write(
+            m_socket,
+            *m_header_res,
+            boost::asio::bind_executor(
+                m_strand,
+                std::bind(
+                    &session::on_write,
+                    shared_from_this(),
+                    std::placeholders::_1,
+                    std::placeholders::_2)));
     }
     else
     {
@@ -162,24 +173,24 @@ void session::on_timer(const boost::system::error_code& error)
         std::piecewise_construct,
         std::make_tuple(std::move(buffer)),
         std::make_tuple(http::status::ok, m_req.version()));
-        m_res->set(http::field::body, "--frame");
+        m_res->set(http::field::body, "--" + m_frame_boundary);
         m_res->set(http::field::server, BOOST_BEAST_VERSION_STRING);
         m_res->set(http::field::content_type, "image/jpeg");
         m_res->content_length(size);
         m_res->keep_alive(m_req.keep_alive());
-    }
 
-    // Write the response
-    http::async_write(
-        m_socket,
-        *m_res,
-        boost::asio::bind_executor(
-            m_strand,
-            std::bind(
-                &session::on_write,
-                shared_from_this(),
-                std::placeholders::_1,
-                std::placeholders::_2)));
+            // Write the response
+        http::async_write(
+            m_socket,
+            *m_res,
+            boost::asio::bind_executor(
+                m_strand,
+                std::bind(
+                    &session::on_write,
+                    shared_from_this(),
+                    std::placeholders::_1,
+                    std::placeholders::_2)));
+    }
 }
 
 void session::do_close()
@@ -212,7 +223,12 @@ void session::process_frame()
             continue;
         }
         
-        cv::resize(frame, input_frame, cv::Size(320, 240));
+        cv::resize(
+            frame,
+            input_frame,
+            cv::Size(
+                m_inference_context->get_input_width(),
+                m_inference_context->get_input_height()));
         batch.clear();
         batch.push_back(std::move(input_frame));
 

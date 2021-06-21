@@ -150,3 +150,13 @@ bool InferenceContext::parseOutput(std::vector<Detection>& detections)
 
     return true;
 }
+
+int InferenceContext::get_input_height() const
+{
+    return mParams->mInputDims.d[2];
+}
+
+int InferenceContext::get_input_width() const
+{
+    return mParams->mInputDims.d[3];
+}

@@ -32,6 +32,9 @@ public:
     //!
     bool infer(const std::vector<cv::Mat>& batch, std::vector<Detection>& detections);
 
+    int get_input_height() const;
+    int get_input_width() const;
+
 private:
 
     bool preprocessInput(const std::vector<cv::Mat>& batch);
