@@ -144,8 +144,6 @@ void session::on_timer(const boost::system::error_code& error)
     m_frame_buffers.pop();
     auto const size = buffer.size();
 
-    std::cout << "Buffer size: " << size << std::endl;
-
     if (size == 0)
     {
         // Writing termination boundary
