@@ -85,7 +85,7 @@ int main(int argc, char** argv)
             address = net::ip::make_address("0.0.0.0");
             port = 8080;
             working_dir = std::make_shared<std::string>(".");
-            threads = 16;
+            threads = 2;
         }
         else if (argc == 5)
         {
@@ -99,7 +99,7 @@ int main(int argc, char** argv)
             std::cerr <<
                 "Usage: ultra_face_onnx <address> <port>\n" <<
                 "Example:\n" <<
-                "    ultra_face_onnx 0.0.0.0 8080 . 16\n";
+                "    ultra_face_onnx 0.0.0.0 8080 . 2\n";
             return EXIT_FAILURE;
         }
 

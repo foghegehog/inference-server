@@ -92,7 +92,7 @@ void session::on_write(
         return fail(ec, "write");
     }
 
-    if (m_files_iterator.is_finished() && m_frame_buffers.empty())
+    if (m_frame_reader.is_finished() && m_frame_buffers.empty())
     {
         log("Closing");
         do_close();
@@ -123,10 +123,10 @@ void session::on_write(
         auto processing_time = processing_end - processing_start;
         m_statistics.update_avg_processing(processing_time.count());
         pause -= processing_time;
-    } while (!m_files_iterator.is_finished()
+    } while (!m_frame_reader.is_finished()
         && (pause.count() > m_statistics.get_avg_processing_time()));
 
-    if (m_files_iterator.is_finished())
+    if (m_frame_reader.is_finished())
     {
         // Denotes end of images list
         log("Image list finished.");
@@ -216,13 +216,11 @@ void session::process_frame()
     bool finished = false;
     do
     {
-        auto filepath = m_files_iterator.get_file_path();
-
-        inference::gLogInfo << "Reading image from path " << filepath << std::endl;
-        frame = cv::imread(filepath);
+        log("Reading next frame");
+        frame = m_frame_reader.read_frame();
         if (frame.empty())
         {
-            log(filepath + " is empty.");
+            log("Frame + is empty. Skipped.");
             continue;
         }
         
@@ -260,10 +258,8 @@ void session::process_frame()
         cv::imencode(".jpg", frame, buffer, std::vector<int> {cv::IMWRITE_JPEG_QUALITY, 95});
         m_frame_buffers.push(std::move(buffer));
         inference::gLogInfo << "Frame ready." << std::endl;
-
-        finished = m_files_iterator.move_next();
     }
-    while(detections.empty() && !finished);
+    while(frame.empty() && !m_frame_reader.is_finished());
     
     log("Finished processing frame.");
 }

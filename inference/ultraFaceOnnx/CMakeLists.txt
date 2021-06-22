@@ -7,7 +7,8 @@ SET(INFERENCE_SOURCES
     src/http/session.cpp
     src/http/query.cpp
     src/statistics.cpp
-    src/files_iterator.cpp)
+    src/frames/files_iterator.cpp
+    src/frames/filesystem_frame_reader.cpp)
 
 set(INFERENCE_PARSERS "onnx")
 

@@ -2,7 +2,7 @@
 #define SESSION_H
 
 #include "../inference/inferenceContext.h"
-#include "../files_iterator.h"
+#include "../frames/filesystem_frame_reader.h"
 #include "../statistics.h"
 
 #include <boost/asio/ip/tcp.hpp>
@@ -14,7 +14,6 @@
 #include <boost/beast/version.hpp>
 
 #include <chrono>
-
 #include <functional>
 #include <memory>
 #include <queue>
@@ -39,13 +38,13 @@ class session : public std::enable_shared_from_this<session>
 
     boost::asio::steady_timer m_timer;
 
-    const std::chrono::nanoseconds m_frame_pause = std::chrono::nanoseconds(40000000);
+    const std::chrono::nanoseconds m_frame_pause = std::chrono::nanoseconds(30000000);
 
     statistics m_statistics;
 
     const std::string m_base_folder = "../../data/ultraface/corridor/";
 
-    files_iterator m_files_iterator;
+    filesystem_frame_reader m_frame_reader;
 
     const std::string m_frame_boundary = "frame";
 
@@ -57,7 +56,7 @@ public:
         : m_socket(std::move(socket)),
         m_strand(m_socket.get_executor()),
         m_timer(ioc),
-        m_files_iterator(m_base_folder, ".jpg"),
+        m_frame_reader(m_base_folder, ".jpg"),
         m_inference_context(std::move(inference_context))
     {
     }
