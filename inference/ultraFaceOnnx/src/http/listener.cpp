@@ -15,10 +15,12 @@ using tcp = boost::asio::ip::tcp;
 listener::listener(
     boost::asio::io_context& ioc,
     tcp::endpoint endpoint,
+    const std::string& base_dir,
     UltraFaceOnnxEngine& inferenceEngine)
     :m_acceptor(ioc),
     m_socket(ioc),
     m_ioc(ioc),
+    m_base_dir(base_dir),
     m_inference_engine(inferenceEngine)
 {
     beast::error_code ec;
@@ -90,6 +92,7 @@ void listener::on_accept(beast::error_code ec)
         std::make_shared<session>(
             m_ioc,
             std::move(m_socket),
+            m_base_dir,
             m_inference_engine.get_inference_context())->run();
     }
 

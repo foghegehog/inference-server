@@ -4,6 +4,7 @@
 #include "../inference/inferenceContext.h"
 #include "../frames/filesystem_frame_reader.h"
 #include "../statistics.h"
+#include "routing.h"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/strand.hpp>
@@ -38,13 +39,13 @@ class session : public std::enable_shared_from_this<session>
 
     boost::asio::steady_timer m_timer;
 
-    const std::chrono::nanoseconds m_frame_pause = std::chrono::nanoseconds(30000000);
+    const std::chrono::nanoseconds m_frame_pause = std::chrono::nanoseconds(35000000);
 
     statistics m_statistics;
 
-    const std::string m_base_folder = "../../data/ultraface/corridor/";
+    routing m_routing;
 
-    filesystem_frame_reader m_frame_reader;
+    std::unique_ptr<frame_reader> m_frame_reader;
 
     const std::string m_frame_boundary = "frame";
 
@@ -52,11 +53,12 @@ public:
     // Take ownership of the stream
     session(boost::asio::io_context& ioc,
         boost::asio::ip::tcp::socket socket,
+        const std::string& base_folder,
         std::unique_ptr<InferenceContext>&& inference_context)
         : m_socket(std::move(socket)),
         m_strand(m_socket.get_executor()),
         m_timer(ioc),
-        m_frame_reader(m_base_folder, ".jpg"),
+        m_routing(std::map<std::string, std::string>{{"base_dir", base_folder}}),
         m_inference_context(std::move(inference_context))
     {
     }

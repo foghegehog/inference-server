@@ -48,14 +48,32 @@ void session::on_read(
     // This indicates that the session was closed
     if(ec == http::error::end_of_stream)
     {
-        return do_close();
+        do_close();
+        return;
     }
 
     if(ec)
     {
         fail(ec, "read");
+        return;
     }
     
+    auto query_string = m_req.target().to_string();
+    log("Parsing request query: " + query_string);
+    query q(query_string);
+    if (q.m_path.empty())
+    {
+        log("Wrong request format: frames source unknown.");
+        return;
+    }
+
+    m_frame_reader = m_routing.create_reader(q.m_path[0], q);
+    if (!m_frame_reader)
+    {
+        log(std::string("Unknown frames source: ") + q.m_path[0]);
+        return;
+    }
+
     inference::gLogInfo << "Start streaming the GPU inference results." << std::endl;
 
     // The lifetime of the response has to extend
@@ -92,7 +110,7 @@ void session::on_write(
         return fail(ec, "write");
     }
 
-    if (m_frame_reader.is_finished() && m_frame_buffers.empty())
+    if (m_frame_reader->is_finished() && m_frame_buffers.empty())
     {
         log("Closing");
         do_close();
@@ -123,10 +141,10 @@ void session::on_write(
         auto processing_time = processing_end - processing_start;
         m_statistics.update_avg_processing(processing_time.count());
         pause -= processing_time;
-    } while (!m_frame_reader.is_finished()
+    } while (!m_frame_reader->is_finished()
         && (pause.count() > m_statistics.get_avg_processing_time()));
 
-    if (m_frame_reader.is_finished())
+    if (m_frame_reader->is_finished())
     {
         // Denotes end of images list
         log("Image list finished.");
@@ -217,7 +235,7 @@ void session::process_frame()
     do
     {
         log("Reading next frame");
-        frame = m_frame_reader.read_frame();
+        frame = m_frame_reader->read_frame();
         if (frame.empty())
         {
             log("Frame + is empty. Skipped.");
@@ -259,7 +277,7 @@ void session::process_frame()
         m_frame_buffers.push(std::move(buffer));
         inference::gLogInfo << "Frame ready." << std::endl;
     }
-    while(frame.empty() && !m_frame_reader.is_finished());
+    while(frame.empty() && !m_frame_reader->is_finished());
     
     log("Finished processing frame.");
 }

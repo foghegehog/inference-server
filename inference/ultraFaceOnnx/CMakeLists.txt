@@ -6,6 +6,7 @@ SET(INFERENCE_SOURCES
     src/http/listener.cpp
     src/http/session.cpp
     src/http/query.cpp
+    src/http/routing.cpp
     src/statistics.cpp
     src/frames/files_iterator.cpp
     src/frames/filesystem_frame_reader.cpp)

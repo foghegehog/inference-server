@@ -2,6 +2,8 @@
 
 #include <opencv2/imgcodecs.hpp>
 
+#include <iostream>
+
 bool filesystem_frame_reader::is_finished()
 {
     return m_files_iterator.is_finished();

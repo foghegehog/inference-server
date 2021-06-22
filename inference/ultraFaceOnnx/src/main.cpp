@@ -78,20 +78,20 @@ int main(int argc, char** argv)
     {
         net::ip::address address;
         unsigned short port;
-        std::shared_ptr<std::string> working_dir;
+        std::string working_dir;
         int threads;
         if (argc == 1)
         {
             address = net::ip::make_address("0.0.0.0");
             port = 8080;
-            working_dir = std::make_shared<std::string>(".");
-            threads = 2;
+            working_dir = std::string("../../data/ultraface/");
+            threads = 16;
         }
         else if (argc == 5)
         {
             address = net::ip::make_address(argv[1]);
             port = static_cast<unsigned short>(std::atoi(argv[2]));
-            working_dir = std::make_shared<std::string>(argv[3]);
+            working_dir = std::string(argv[3]);
             threads = std::max<int>(1, std::atoi(argv[4]));
         }
         else
@@ -99,7 +99,7 @@ int main(int argc, char** argv)
             std::cerr <<
                 "Usage: ultra_face_onnx <address> <port>\n" <<
                 "Example:\n" <<
-                "    ultra_face_onnx 0.0.0.0 8080 . 2\n";
+                "    ultra_face_onnx 0.0.0.0 8080 '../../data/ultraface/' 16\n";
             return EXIT_FAILURE;
         }
 
@@ -129,6 +129,7 @@ int main(int argc, char** argv)
         std::make_shared<listener>(
             ioc,
             tcp::endpoint{address, port},
+            working_dir,
             inferenceEngine)->run();
 
         // Run the I/O service on the requested number of threads
