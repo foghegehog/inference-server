@@ -238,7 +238,7 @@ void session::process_frame()
         frame = m_frame_reader->read_frame();
         if (frame.empty())
         {
-            log("Frame + is empty. Skipped.");
+            log("Frame is empty. Skipped.");
             continue;
         }
         
