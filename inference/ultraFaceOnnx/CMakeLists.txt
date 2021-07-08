@@ -13,9 +13,10 @@ SET(INFERENCE_SOURCES
 
 set(INFERENCE_PARSERS "onnx")
 
-find_package( OpenCV REQUIRED )
+find_package(OpenCV REQUIRED)
 find_package(Boost COMPONENTS thread system filesystem regex REQUIRED)
-include_directories( ${OpenCV_INCLUDE_DIRS} )
+include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(include)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

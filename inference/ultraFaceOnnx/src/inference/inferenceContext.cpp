@@ -1,4 +1,4 @@
-#include "../../include/inference/inferenceContext.h"
+#include "inference/inferenceContext.h"
 
 #include <iostream> 
 #include <set>

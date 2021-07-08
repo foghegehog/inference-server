@@ -1,4 +1,4 @@
-#include "../../include/http/query.h"
+#include "http/query.h"
 
 query::query(const std::string& query_string)
 {

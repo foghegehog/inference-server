@@ -1,7 +1,7 @@
-#include "../../include/http/lib.h"
-#include "../../include/http/listener.h"
-#include "../../include/http/session.h"
-#include "../../include/inference/ultraFaceOnnx.h"
+#include "http/lib.h"
+#include "http/listener.h"
+#include "http/session.h"
+#include "inference/ultraFaceOnnx.h"
 
 #include <boost/beast/http.hpp>
 #include <boost/asio/strand.hpp>

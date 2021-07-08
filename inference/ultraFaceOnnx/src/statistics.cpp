@@ -1,4 +1,4 @@
-#include "../include/statistics.h"
+#include "statistics.h"
 
 void statistics::update_avg_processing(double duration)
 {

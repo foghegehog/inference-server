@@ -1,6 +1,6 @@
-#include "../../include/http/session.h"
-#include "../../include/http/lib.h"
-#include "../../include/http/query.h"
+#include "http/session.h"
+#include "http/lib.h"
+#include "http/query.h"
 
 #include <functional> 
 #include <boost/asio.hpp>
