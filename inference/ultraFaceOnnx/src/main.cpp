@@ -37,24 +37,13 @@ const std::string gInferenceName = "TensorRT.ultra_face_onnx";
 //!
 //! \brief Initializes members of the params struct using the command line args
 //!
-std::shared_ptr<UltraFaceInferenceParams> initializeInferenceParams(const inferenceCommon::Args& args)
+void fillInferenceParams(
+    std::shared_ptr<UltraFaceInferenceParams>& params,
+    const inferenceCommon::Args& args)
 {
-    auto params = std::make_shared<UltraFaceInferenceParams>();
-    params->dataDirs.push_back("data/ultraface/");
-    params->onnxFileName = "ultraFace-RFB-320.onnx";
-    params->inputTensorNames.push_back("input");
-    params->outputTensorNames.push_back("scores");
-    params->outputTensorNames.push_back("boxes");
-    params->mPreprocessingMeans = {127.0f, 127.0f, 127.0f};
-    params->mPreprocessingNorm = 128.0f;
-    params->mDetectionThreshold = 0.9;
-    params->mNumClasses = 2;
-    params->mDetectionClassIndex = 1;
     params->dlaCore = args.useDLACore;
     params->int8 = args.runInInt8;
     params->fp16 = args.runInFp16;
-
-    return params;
 }
 
 template<class Body, class Stream>
@@ -71,48 +60,163 @@ void write_response(
     http::write(stream, sr, ec);
 }
 
+void read_config(
+    net::ip::address& address,
+    unsigned short& port,
+    std::string& working_dir,
+    int& threads,
+    std::shared_ptr<UltraFaceInferenceParams>& params)
+{
+    inference::gLogInfo << "Reading configuration." << std::endl;
+
+    std::ifstream config("config.ini");
+    const char separator = ' ';
+    for(std::string line; std::getline(config, line); )
+    {
+        auto space_indx = line.find_first_of(separator);
+        auto name = line.substr(0, space_indx);
+        auto value = line.substr(space_indx + 1, line.size());
+        inference::gLogInfo << name << ": ";
+        if(name == "ADDRESS")
+        {
+            address = net::ip::make_address(value);
+            inference::gLogInfo << address << std::endl;
+            continue;
+        }
+        else if(name == "PORT")
+        {
+            port = stoi(value);
+            inference::gLogInfo << port << std::endl;
+            continue;
+        }
+        else if(name == "WORKING_DIR")
+        {
+            working_dir = std::move(value);
+            inference::gLogInfo << working_dir << std::endl;
+            continue;
+        }
+        else if(name == "THREADS")
+        {
+            threads = stoi(value);
+            inference::gLogInfo << threads << std::endl;
+            continue;
+        }
+        else if(name == "DATA_DIR")
+        {
+            params->dataDirs.push_back(std::move(value));
+            inference::gLogInfo << params->dataDirs[0] << std::endl;
+            continue;
+        }
+        else if(name == "ONNX_FILE_NAME")
+        {
+            params->onnxFileName = std::move(value);
+            inference::gLogInfo << params->onnxFileName << std::endl;
+            continue;
+        }
+        else if(name == "INPUT_TENSORS")
+        {
+            params->inputTensorNames.push_back(std::move(value));
+            inference::gLogInfo << params->inputTensorNames[0] << std::endl;
+            continue;
+        }
+        else if(name == "OUTPUT_TENSORS")
+        {
+            string::size_type start = 0;
+            for(
+                auto stop = value.find_first_of(separator);
+                stop != string::npos;
+                stop = value.find_first_of(separator, start))
+            {
+                params->outputTensorNames.push_back(value.substr(start, stop - start));
+                start = stop + 1;
+                inference::gLogInfo << params->outputTensorNames.back() << " ";
+            }
+            params->outputTensorNames.push_back(value.substr(start, value.size() - start));
+            inference::gLogInfo << params->outputTensorNames.back() << std::endl;
+            continue;
+        }
+        else if(name == "PREPROCESSING_MEANS")
+        {
+            string::size_type start = 0;
+            auto channel = 0;
+            for(
+                auto stop = value.find_first_of(separator);
+                stop != string::npos;
+                stop = value.find_first_of(separator, start))
+            {
+                auto mean = stof(value.substr(start, stop - start));
+                params->mPreprocessingMeans[channel++] = mean;
+                start = stop + 1;
+                inference::gLogInfo << mean << " ";
+            }
+            auto mean = stof(value.substr(start, value.size() - start));
+            params->mPreprocessingMeans[channel] = mean;
+            inference::gLogInfo << mean << std::endl;
+            continue;
+        }
+        else if(name == "PREPROCESSING_NORM")
+        {
+            params->mPreprocessingNorm = stof(value);
+            inference::gLogInfo << params->mPreprocessingNorm << std::endl;
+            continue;
+        }
+        else if(name == "DETECTION_THRESHOLD")
+        {
+            params->mDetectionThreshold = stof(value);
+            inference::gLogInfo << params->mDetectionThreshold << std::endl;
+            continue;
+        }
+        else if(name == "NUM_CLASSES")
+        {
+            params->mNumClasses = stoi(value);
+            inference::gLogInfo << params->mNumClasses << std::endl;
+            continue;
+        }
+        else if(name == "DETECTION_CLASS")
+        {
+            params->mDetectionClassIndex = stoi(value);
+            inference::gLogInfo << params->mDetectionClassIndex << std::endl;
+            continue;
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
-        try
+    net::ip::address address;
+    unsigned short port;
+    std::string working_dir;
+    int threads;
+    std::shared_ptr<UltraFaceInferenceParams> inferenceParams;
+    inferenceCommon::Args args;
+
+    try
     {
-        net::ip::address address;
-        unsigned short port;
-        std::string working_dir;
-        int threads;
-        if (argc == 1)
-        {
-            address = net::ip::make_address("0.0.0.0");
-            port = 8080;
-            working_dir = std::string("../../data/ultraface/");
-            threads = 16;
-        }
-        else if (argc == 5)
-        {
-            address = net::ip::make_address(argv[1]);
-            port = static_cast<unsigned short>(std::atoi(argv[2]));
-            working_dir = std::string(argv[3]);
-            threads = std::max<int>(1, std::atoi(argv[4]));
-        }
-        else
-        {
-            std::cerr <<
-                "Usage: ultra_face_onnx <address> <port>\n" <<
-                "Example:\n" <<
-                "    ultra_face_onnx 0.0.0.0 8080 '../../data/ultraface/' 16\n";
-            return EXIT_FAILURE;
-        }
-
-
         auto inferenceTest = inference::gLogger.defineTest(gInferenceName, 0, {});
         inference::gLogger.reportTestStart(inferenceTest);
+        inferenceParams = std::make_shared<UltraFaceInferenceParams>();
 
-        inferenceCommon::Args args;
-        bool argsOK = inferenceCommon::parseArgs(args, 0, {});
-        auto params = initializeInferenceParams(args);
-        UltraFaceOnnxEngine inferenceEngine(params);
+        read_config(address, port, working_dir, threads, inferenceParams);
+     
+        if (argc > 1)
+        {
+            inference::gLogInfo << "Parsing parameters." << std::endl;
+            address = net::ip::make_address(argv[1]);
+            inference::gLogInfo << "Address: " << address << std::endl;
+            port = static_cast<unsigned short>(std::atoi(argv[2]));
+            inference::gLogInfo << "Port: " << port << std::endl;
+            working_dir = std::string(argv[3]);
+            inference::gLogInfo << "Working directory: " << working_dir << std::endl;
+            threads = std::max<int>(1, std::atoi(argv[4]));
+            inference::gLogInfo << "Num threads: " << threads << std::endl;
+        }
 
-        inference::gLogInfo << "Building and running a GPU inference engine for Onnx ultra face" << std::endl;
+        inferenceCommon::parseArgs(args, argc, argv);
+        fillInferenceParams(inferenceParams, args);
+
+        UltraFaceOnnxEngine inferenceEngine(inferenceParams);
+
+        inference::gLogInfo << "Building and running a GPU inference engine for ultraFace Onnx" << std::endl;
 
         if (!inferenceEngine.build())
         {

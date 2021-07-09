@@ -24,4 +24,6 @@ find_package(Threads REQUIRED)
 SET(CUSTOM_LIBS ${OpenCV_LIBS} ${Boost_LIBRARIES})
 SET(CUSTOM_SOURCES ${BOOST_BEAST_FILES})
 
+configure_file(config.ini ${TRT_OUT_DIR}/config.ini)
+
 include(../CMakeInferenceTemplate.txt)
