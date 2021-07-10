@@ -13,6 +13,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/config.hpp>
+#include <boost/program_options.hpp>
 #include <cmath>
 #include <chrono>
 #include <cstdlib>
@@ -31,6 +32,8 @@ namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+
+namespace po = boost::program_options;
 
 const std::string gInferenceName = "TensorRT.ultra_face_onnx";
 
@@ -181,6 +184,81 @@ void read_config(
     }
 }
 
+void parseArgs(
+    int argc,
+    char** argv,
+    net::ip::address& address,
+    unsigned short& port,
+    std::string& working_dir,
+    int& threads,
+    inferenceCommon::Args& args)
+{
+    using namespace std;
+    po::options_description desc;
+    desc.add_options()
+        ("address,a", 
+        // Throws boost::bad_any_cast if no defaut_value or required() provided.
+         po::value<string>()->default_value(address.to_string()),
+         "IPv4 address to run the server on.")
+        ("port,p",
+         po::value<unsigned short>(),
+         "Port number to accept connections.")
+        ("working_dir,w",
+         po::value<string>()->default_value(working_dir),
+         "Working directory of the application.")
+        ("threads,t",
+         po::value<int>(),
+         "Number of threads.")
+        ("dlaCores,d",
+         po::value<int32_t>(),
+         "Use DLA Cores.")
+        ("int8,i",
+         po::bool_switch(&(args.runInInt8)),
+         "Run in int8.")
+        ("fp16,f",
+         po::bool_switch(&(args.runInFp16)),
+         "Run in fp16.");
+
+    po::variables_map vm;
+    inference::gLogInfo << "Parsing commandline args." << std::endl;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    // Otherwise bool_switches are not filled
+    notify(vm);
+
+    if (vm.count("address"))
+    {
+        address = net::ip::make_address(vm["address"].as<string>());
+        inference::gLogInfo << "Address: " << address << std::endl;
+    }
+
+    if (vm.count("port"))
+    {
+        port = vm["port"].as<unsigned short>();
+        inference::gLogInfo << "Port: " << port << std::endl;
+    }
+
+    if (vm.count("working_dir"))
+    {
+        working_dir = vm["working_dir"].as<string>();
+        inference::gLogInfo << "Working dir: " << working_dir << std::endl;
+    }
+
+    if (vm.count("threads"))
+    {
+        working_dir = vm["threads"].as<int>();
+        inference::gLogInfo << "Num threads: " << threads << std::endl;
+    }
+
+    if (vm.count("threads"))
+    {
+        args.useDLACore = vm["dlaCores"].as<int32_t>();
+        inference::gLogInfo << "Use DLA Cores: " << args.useDLACore << std::endl;
+    }
+
+    inference::gLogInfo << "Run in int8 mode: " << args.runInInt8 << std::endl;
+    inference::gLogInfo << "Run in fp16 mode: " << args.runInFp16 << std::endl;
+}
+
 int main(int argc, char** argv)
 {
     net::ip::address address;
@@ -200,19 +278,9 @@ int main(int argc, char** argv)
      
         if (argc > 1)
         {
-            inference::gLogInfo << "Parsing parameters." << std::endl;
-            address = net::ip::make_address(argv[1]);
-            inference::gLogInfo << "Address: " << address << std::endl;
-            port = static_cast<unsigned short>(std::atoi(argv[2]));
-            inference::gLogInfo << "Port: " << port << std::endl;
-            working_dir = std::string(argv[3]);
-            inference::gLogInfo << "Working directory: " << working_dir << std::endl;
-            threads = std::max<int>(1, std::atoi(argv[4]));
-            inference::gLogInfo << "Num threads: " << threads << std::endl;
+            parseArgs(argc, argv, address, port, working_dir, threads, args);
+            fillInferenceParams(inferenceParams, args);
         }
-
-        inferenceCommon::parseArgs(args, argc, argv);
-        fillInferenceParams(inferenceParams, args);
 
         UltraFaceOnnxEngine inferenceEngine(inferenceParams);
 
